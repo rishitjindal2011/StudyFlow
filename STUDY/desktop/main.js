@@ -100,7 +100,18 @@ function createWindow() {
   });
 
   ensureAppUrl().then((url) => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(url);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const preloadFile = path.join(appRoot, 'webview-guest-preload.js');
+      const preloadUrl = fs.existsSync(preloadFile)
+        ? 'file:///' + preloadFile.replace(/\\/g, '/')
+        : '';
+      mainWindow.loadURL(url).then(() => {
+        if (!preloadUrl) return;
+        mainWindow.webContents.executeJavaScript(
+          'window.__SF_WEBVIEW_PRELOAD=' + JSON.stringify(preloadUrl) + ';'
+        ).catch(() => {});
+      });
+    }
   }).catch((err) => {
     const html = path.join(appRoot, 'studyflow.html');
     if (fs.existsSync(html)) mainWindow.loadFile(html);
@@ -169,6 +180,11 @@ ipcMain.handle('get-pc-lock-status', async () => {
 ipcMain.handle('set-blocked-domains', async (_event, domains) => {
   if (Array.isArray(domains)) blockedDomains = domains;
   return { ok: true };
+});
+
+ipcMain.handle('get-webview-preload-path', async () => {
+  const p = path.join(getAppRoot(), 'webview-guest-preload.js');
+  return fs.existsSync(p) ? p : '';
 });
 
 app.whenReady().then(() => {

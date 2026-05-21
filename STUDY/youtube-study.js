@@ -63,17 +63,26 @@
     renderGrid(extra);
   }
 
+  function openChannel(url) {
+    if (!url) return;
+    if (typeof window.__studyflowOpenYoutube === 'function') {
+      window.__studyflowOpenYoutube(url);
+      return;
+    }
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'SF_OPEN_YOUTUBE', url: url }, '*');
+        return;
+      }
+    } catch (_) {}
+    window.location.href = url;
+  }
+
   grid.addEventListener('click', function (e) {
     const btn = e.target.closest('[data-yt-url]');
     if (!btn) return;
     e.preventDefault();
-    const url = btn.getAttribute('data-yt-url');
-    if (!url) return;
-    try {
-      parent.postMessage({ type: 'SF_OPEN_YOUTUBE', url: url }, '*');
-    } catch (_) {
-      window.location.href = url;
-    }
+    openChannel(btn.getAttribute('data-yt-url'));
   });
 
   window.addEventListener('message', (e) => {

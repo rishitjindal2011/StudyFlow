@@ -2984,14 +2984,39 @@ PERSONALITY & RULES:
       updateWebNavButtons();
     }
 
+    function ensureWebviewPreload(wv) {
+      if (!wv || !desktopAvailable() || wv.dataset.preloadReady === '1') return;
+      const apply = (fileUrl) => {
+        if (!fileUrl) return;
+        wv.setAttribute('preload', fileUrl);
+        wv.dataset.preloadReady = '1';
+      };
+      if (window.__SF_WEBVIEW_PRELOAD) {
+        apply(window.__SF_WEBVIEW_PRELOAD);
+        return;
+      }
+      if (studyflowDesktop.getWebviewPreloadPath) {
+        studyflowDesktop.getWebviewPreloadPath().then((p) => {
+          if (p) apply('file:///' + String(p).replace(/\\/g, '/'));
+        }).catch(() => {});
+      }
+    }
+
     function initWebBrowser() {
       if (webInited) return;
       webInited = true;
       updateWebEmbedHint();
       const frame = document.getElementById('webFrame');
       const wv = document.getElementById('webView');
+      ensureWebviewPreload(wv);
       if (frame) frame.addEventListener('load', onWebFrameLoad);
       if (wv) {
+        wv.addEventListener('ipc-message', (e) => {
+          if (e.channel === 'sf-open-youtube' && e.args && e.args[0]) {
+            hideYoutubeBlocked();
+            webLoadUrl(String(e.args[0]), { push: true, displayInBar: e.args[0], skipYoutubeCheck: false });
+          }
+        });
         wv.addEventListener('will-navigate', async (e) => {
           if (!e.url || e.url.includes('youtube-study.html')) return;
           const ok = await guardWebviewYoutubeUrl(e.url, wv);
