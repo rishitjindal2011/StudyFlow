@@ -2800,6 +2800,24 @@ PERSONALITY & RULES:
       webLoadUrl(youtubeHubUrl(true), { push: true, displayInBar: 'Study YouTube', skipYoutubeCheck: true });
     }
 
+    /** Browser iframe hub (same origin) — direct open; webview uses ipc preload instead */
+    function wireHubIframe(frame) {
+      if (!frame || isWebViewEl(frame)) return;
+      const src = frame.src || frame.getAttribute('src') || '';
+      if (!/youtube-study\.html/i.test(src)) return;
+      try {
+        const win = frame.contentWindow;
+        if (!win) return;
+        const openFn = function (url) {
+          if (!url) return;
+          hideYoutubeBlocked();
+          webLoadUrl(url, { push: true, displayInBar: url, skipYoutubeCheck: false });
+        };
+        win.__studyflowOpenYoutube = openFn;
+        win.openChannel = openFn;
+      } catch (_) {}
+    }
+
     async function webLoadUrl(url, opts) {
       url = normalizeYoutubeEntryUrl(url);
       const push = !opts || opts.push !== false;
@@ -2826,6 +2844,11 @@ PERSONALITY & RULES:
           try { frame.loadURL(url); } catch (_) { frame.src = url; }
         } else {
           frame.src = url;
+          if (/youtube-study\.html/i.test(url)) {
+            frame.addEventListener('load', function wireHubOnce() {
+              wireHubIframe(frame);
+            }, { once: true });
+          }
         }
       }
       if (isWebViewEl(frame) && isYoutubePageUrl(url)) {
@@ -2950,6 +2973,9 @@ PERSONALITY & RULES:
         return;
       }
 
+      if (href.includes('youtube-study.html') && !isWebViewEl(frame)) {
+        wireHubIframe(frame);
+      }
       if (isEduYoutubeEnabled() && isYoutubePageUrl(href)) {
         const yt = await checkYoutubeForWeb(href);
         if (!(await applyYoutubeGuardResult(yt, frame))) return;
@@ -3044,7 +3070,13 @@ PERSONALITY & RULES:
       getWebBrowserEl();
       window.addEventListener('message', async (e) => {
         if (e.data?.type === 'SF_OPEN_YOUTUBE' && e.data.url) {
-          webLoadUrl(e.data.url, { push: true, displayInBar: e.data.url, skipYoutubeCheck: false });
+          hideYoutubeBlocked();
+          await webLoadUrl(e.data.url, { push: true, displayInBar: e.data.url, skipYoutubeCheck: false });
+          try {
+            if (e.source && e.source.postMessage) {
+              e.source.postMessage({ type: 'SF_OPEN_YOUTUBE_ACK' }, '*');
+            }
+          } catch (_) {}
           return;
         }
         if (e.data?.type === 'SF_YT_GUARD_CHECK' && e.data.url) {

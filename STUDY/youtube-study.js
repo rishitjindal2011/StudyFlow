@@ -69,12 +69,31 @@
       window.__studyflowOpenYoutube(url);
       return;
     }
+    var posted = false;
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: 'SF_OPEN_YOUTUBE', url: url }, '*');
-        return;
+        posted = true;
+      }
+      if (window.top && window.top !== window && window.top !== window.parent) {
+        window.top.postMessage({ type: 'SF_OPEN_YOUTUBE', url: url }, '*');
+        posted = true;
       }
     } catch (_) {}
+    if (posted) {
+      var ack = false;
+      function onAck(ev) {
+        if (ev.data && ev.data.type === 'SF_OPEN_YOUTUBE_ACK') ack = true;
+      }
+      window.addEventListener('message', onAck);
+      setTimeout(function () {
+        window.removeEventListener('message', onAck);
+        if (!ack && /youtube-study\.html/i.test(location.href)) {
+          window.location.href = url;
+        }
+      }, 250);
+      return;
+    }
     window.location.href = url;
   }
 
