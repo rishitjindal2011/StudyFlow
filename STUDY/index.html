@@ -246,7 +246,7 @@
         packaged as a real desktop app for students.
       </p>
       <div class="cta-row">
-        <a class="btn btn-primary" id="btnDownload" href="#" download>
+        <a class="btn btn-primary" id="btnDownload" href="https://github.com/rishitjindal2011/StudyFlow/releases" rel="noopener">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download for Windows
         </a>
@@ -308,40 +308,62 @@
       var nameEl = document.getElementById('installerName');
       var verEl = document.getElementById('versionLabel');
 
-      btn.href = cfg.installerUrl;
-      btn.setAttribute('download', cfg.installerFile);
       nameEl.textContent = cfg.installerFile;
       verEl.textContent = 'v' + cfg.version;
-
-      document.getElementById('linkPortable').href = cfg.portableUrl;
       document.getElementById('linkReleases').href = cfg.releasesPage;
 
-      // Optional: warn if latest release is not published yet
-      if (cfg._isLocalHost && cfg._isLocalHost()) {
-        status.textContent = 'Local test — download uses desktop/dist/ on this PC (run Test-Local.bat or npx serve).';
-        status.className = 'dl-status ok';
-        return;
+      function setNotReady(msg) {
+        btn.href = cfg.releasesPage;
+        btn.removeAttribute('download');
+        btn.onclick = function (e) {
+          e.preventDefault();
+          window.open(cfg.releasesPage, '_blank', 'noopener');
+        };
+        status.textContent = msg;
+        status.className = 'dl-status warn';
       }
 
-      fetch('https://api.github.com/repos/' + cfg.repo + '/releases/latest')
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (rel) {
-          if (!rel) {
-            status.textContent = 'Tip: publish the installer on GitHub Releases so this download works for everyone.';
-            status.className = 'dl-status warn';
-            return;
-          }
-          var assets = rel.assets || [];
-          var hit = assets.some(function (a) { return a.name === cfg.installerFile; });
-          if (hit) {
-            status.textContent = 'Installer ready — ' + (rel.published_at || '').slice(0, 10);
-            status.className = 'dl-status ok';
-          } else {
-            status.textContent = 'Release exists but upload ' + cfg.installerFile + ' to match the download button.';
-            status.className = 'dl-status warn';
-          }
-        })
-        .catch(function () {});
+      cfg.resolveInstallerDownload().then(function (dl) {
+        if (dl.local) {
+          btn.href = dl.url;
+          btn.setAttribute('download', cfg.installerFile);
+          btn.onclick = null;
+          status.textContent = 'Local test — downloads from desktop/dist/ on this PC.';
+          status.className = 'dl-status ok';
+          document.getElementById('linkPortable').href = cfg.portableUrl;
+          return;
+        }
+
+        if (dl.ready) {
+          btn.href = dl.url;
+          btn.setAttribute('download', cfg.installerFile);
+          btn.onclick = null;
+          status.textContent = 'Installer ready' + (dl.published ? ' — ' + String(dl.published).slice(0, 10) : '') + '.';
+          status.className = 'dl-status ok';
+          fetch('https://api.github.com/repos/' + cfg.repo + '/releases/latest')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (rel) {
+              if (!rel) return;
+              var portable = (rel.assets || []).find(function (a) { return a.name === cfg.portableFile; });
+              document.getElementById('linkPortable').href = portable
+                ? portable.browser_download_url
+                : cfg.releasesPage;
+            })
+            .catch(function () {
+              document.getElementById('linkPortable').href = cfg.releasesPage;
+            });
+          return;
+        }
+
+        if (dl.reason === 'no_release') {
+          setNotReady('Installer not published yet — opens GitHub Releases (upload StudyFlow-Setup-1.0.0.exe).');
+        } else if (dl.reason === 'missing_asset') {
+          setNotReady('Release exists but the installer file is missing — upload ' + cfg.installerFile + ' on Releases.');
+        } else {
+          setNotReady('Could not reach GitHub — try again or open Releases.');
+        }
+        document.getElementById('linkPortable').href = cfg.releasesPage;
+      });
     })();
   </script>
 </body>

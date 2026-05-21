@@ -80,7 +80,10 @@ function createWindow() {
   }
 
   setupEmbedSession(session.defaultSession, () => blockedDomains);
-  setupEmbedSession(session.fromPartition('persist:studyflowweb'), () => blockedDomains, { stripMainFrame: true });
+  const webSession = session.fromPartition('persist:studyflowweb');
+  setupEmbedSession(webSession, () => blockedDomains, { stripMainFrame: true });
+  webSession.setPermissionRequestHandler((_wc, _perm, callback) => callback(true));
+  webSession.setPermissionCheckHandler(() => true);
 
   mainWindow = new BrowserWindow({
     width: 1280,

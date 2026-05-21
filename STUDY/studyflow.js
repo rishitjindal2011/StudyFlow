@@ -548,11 +548,28 @@
       return false;
     }
 
+    function guardWebviewYoutubeNavigateSync(url) {
+      if (!url || url.includes('youtube-study.html')) return true;
+      if (!isEduYoutubeEnabled() || !isYoutubePageUrl(url)) return true;
+      const sync = EduYoutube.checkUrlSync(url, DB.eduYoutubeExtra, youtubeHubUrl());
+      if (!sync.decided) return true;
+      return !!sync.allowed;
+    }
+
     async function guardWebviewYoutubeUrl(url, frame) {
       if (!url || url.includes('youtube-study.html')) return true;
       if (!isEduYoutubeEnabled() || !isYoutubePageUrl(url)) return true;
       const yt = await checkYoutubeForWeb(url);
       return applyYoutubeGuardResult(yt, frame);
+    }
+
+    let webLoadSafetyTimer = null;
+    function armWebLoadSafetyTimer() {
+      if (webLoadSafetyTimer) clearTimeout(webLoadSafetyTimer);
+      webLoadSafetyTimer = setTimeout(() => {
+        webLoadSafetyTimer = null;
+        setWebLoading(false);
+      }, 12000);
     }
 
     async function syncWebviewStudyData(wv) {
@@ -2748,8 +2765,7 @@ PERSONALITY & RULES:
     }
 
     function openGoogleHome() {
-      const home = desktopAvailable() ? 'https://www.google.com/' : GOOGLE_HOME;
-      webLoadUrl(home, { push: true, displayInBar: '' });
+      webLoadUrl(GOOGLE_HOME, { push: true, displayInBar: '' });
       registerStudyTab();
       pushBlockedDomainsToBackground();
     }
@@ -2787,12 +2803,19 @@ PERSONALITY & RULES:
       }
       setWebLoading(false);
       const frame = getWebBrowserEl();
-      if (frame) { frame.classList.add('hidden'); frame.removeAttribute('src'); }
+      if (frame && !isWebViewEl(frame)) {
+        frame.classList.add('hidden');
+        frame.removeAttribute('src');
+      } else if (frame) {
+        frame.classList.remove('hidden');
+      }
     }
 
     function hideYoutubeBlocked() {
       const el = document.getElementById('webYoutubeBlocked');
       if (el) el.classList.remove('active');
+      const frame = getWebBrowserEl();
+      if (frame) frame.classList.remove('hidden');
     }
 
     function openYoutubeHub() {
@@ -2833,6 +2856,7 @@ PERSONALITY & RULES:
       hideWebBlockedOverlay();
       hideYoutubeBlocked();
       setWebLoading(true);
+      armWebLoadSafetyTimer();
       const frame = getWebBrowserEl();
       if (isWebViewEl(frame)) await syncWebviewStudyData(frame);
       const urlInp = document.getElementById('webUrlInp');
@@ -2945,7 +2969,12 @@ PERSONALITY & RULES:
     async function onWebFrameLoad() {
       const frame = getWebBrowserEl();
       if (!frame) return;
+      if (webLoadSafetyTimer) {
+        clearTimeout(webLoadSafetyTimer);
+        webLoadSafetyTimer = null;
+      }
       setWebLoading(false);
+      if (isWebViewEl(frame)) frame.classList.remove('hidden');
       let href = '';
       if (isWebViewEl(frame)) {
         try { href = frame.getURL() || ''; } catch (_) { href = ''; }
@@ -3043,27 +3072,35 @@ PERSONALITY & RULES:
             webLoadUrl(String(e.args[0]), { push: true, displayInBar: e.args[0], skipYoutubeCheck: false });
           }
         });
-        wv.addEventListener('will-navigate', async (e) => {
+        wv.addEventListener('will-navigate', (e) => {
           if (!e.url || e.url.includes('youtube-study.html')) return;
-          const ok = await guardWebviewYoutubeUrl(e.url, wv);
-          if (!ok) e.preventDefault();
-        });
-        wv.addEventListener('did-start-navigation', async (e) => {
-          if (!e.url || !e.isInPlace || e.url.includes('youtube-study.html')) return;
-          await guardWebviewYoutubeUrl(e.url, wv);
+          if (guardWebviewYoutubeNavigateSync(e.url)) return;
+          e.preventDefault();
+          const sync = EduYoutube.checkUrlSync(e.url, DB.eduYoutubeExtra, youtubeHubUrl());
+          applyYoutubeGuardResult(sync, wv);
         });
         wv.addEventListener('did-finish-load', onWebFrameLoad);
         wv.addEventListener('did-navigate', onWebFrameLoad);
         wv.addEventListener('did-navigate-in-page', onWebFrameLoad);
         wv.addEventListener('dom-ready', () => {
+          setWebLoading(false);
+          wv.classList.remove('hidden');
           injectWebviewYoutubeGuard(wv);
           if ((wv.getURL() || '').includes('youtube-study.html')) syncWebviewStudyData(wv);
         });
         wv.addEventListener('did-fail-load', (e) => {
           if (e.isMainFrame === false) return;
+          if (webLoadSafetyTimer) {
+            clearTimeout(webLoadSafetyTimer);
+            webLoadSafetyTimer = null;
+          }
           setWebLoading(false);
+          wv.classList.remove('hidden');
+          if (e.errorCode === -3) return;
           if (e.errorCode === -106 || e.errorDescription === 'ERR_INTERNET_DISCONNECTED') {
             showToast('No internet — check your Wi‑Fi, then tap Reload.');
+          } else if (e.errorCode && e.errorCode !== -2) {
+            showToast('Page failed to load (' + e.errorCode + '). Tap Reload.');
           }
         });
       }
