@@ -436,20 +436,40 @@
       return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
     }
 
+    function desktopAvailable() {
+      return typeof studyflowDesktop !== 'undefined' && studyflowDesktop && studyflowDesktop.isDesktop;
+    }
+
     async function syncShield() {
+      const payload = {
+        active: isRun && !isBreak,
+        running: isRun,
+        onBreak: isBreak,
+        domains: DB.blockedSites || []
+      };
+      if (desktopAvailable()) {
+        try { await studyflowDesktop.syncShield(payload); } catch (_) { }
+        return;
+      }
       if (!extAvailable()) return;
       try {
-        await chrome.runtime.sendMessage({
-          type: 'SYNC_SHIELD',
-          active: isRun && !isBreak,
-          running: isRun,
-          onBreak: isBreak,
-          domains: DB.blockedSites || []
-        });
+        await chrome.runtime.sendMessage({ type: 'SYNC_SHIELD', ...payload });
       } catch (_) { }
     }
 
     async function pushBlockedDomainsToBackground() {
+      if (desktopAvailable()) {
+        try {
+          await studyflowDesktop.setBlockedDomains(DB.blockedSites || []);
+          await studyflowDesktop.syncShield({
+            active: isRun && !isBreak,
+            running: isRun,
+            onBreak: isBreak,
+            domains: DB.blockedSites || []
+          });
+        } catch (_) { }
+        return;
+      }
       if (!extAvailable()) return;
       try {
         await chrome.runtime.sendMessage({
@@ -467,6 +487,9 @@
 
     function youtubeHubUrl(refresh) {
       let url = extAvailable() ? chrome.runtime.getURL('youtube-study.html') : 'youtube-study.html';
+      if (desktopAvailable()) {
+        try { url = new URL('youtube-study.html', window.location.href).href; } catch (_) {}
+      }
       if (refresh) url += (url.includes('?') ? '&' : '?') + '_=' + Date.now();
       return url;
     }
@@ -497,19 +520,77 @@
           resolve({ allowed: true });
           return;
         }
-        const sync = EduYoutube.checkUrlSync(url, DB.eduYoutubeExtra, youtubeHubUrl());
+        const hub = youtubeHubUrl();
+        const sync = EduYoutube.checkUrlSync(url, DB.eduYoutubeExtra, hub);
         if (sync.decided) {
           resolve(sync);
           return;
         }
-        if (!extAvailable()) {
-          resolve({ allowed: false, reason: 'Could not verify this video.' });
+        if (extAvailable()) {
+          chrome.runtime.sendMessage({ type: 'CHECK_YOUTUBE_URL', url }, (res) => {
+            resolve(res || { allowed: false, reason: 'Could not verify channel.' });
+          });
           return;
         }
-        chrome.runtime.sendMessage({ type: 'CHECK_YOUTUBE_URL', url }, (res) => {
-          resolve(res || { allowed: false, reason: 'Could not verify channel.' });
-        });
+        EduYoutube.checkUrlAsync(url, DB.eduYoutubeExtra || [], hub)
+          .then(resolve)
+          .catch(() => resolve({ allowed: false, reason: 'Could not verify this video.' }));
       });
+    }
+
+    async function applyYoutubeGuardResult(yt, frame) {
+      if (!yt || yt.allowed) return true;
+      if (yt.redirect) {
+        await webLoadUrl(yt.redirect, { push: false, displayInBar: 'Study YouTube', skipYoutubeCheck: true });
+        return false;
+      }
+      showYoutubeBlocked(yt.reason, yt.channelName, yt.redirect);
+      return false;
+    }
+
+    async function guardWebviewYoutubeUrl(url, frame) {
+      if (!url || url.includes('youtube-study.html')) return true;
+      if (!isEduYoutubeEnabled() || !isYoutubePageUrl(url)) return true;
+      const yt = await checkYoutubeForWeb(url);
+      return applyYoutubeGuardResult(yt, frame);
+    }
+
+    async function syncWebviewStudyData(wv) {
+      if (!isWebViewEl(wv)) return;
+      try {
+        const payload = JSON.stringify(DB);
+        await wv.executeJavaScript(
+          'try { localStorage.setItem("sf5", ' + JSON.stringify(payload) + '); } catch (e) {}',
+          true
+        );
+        if ((wv.getURL() || '').includes('youtube-study.html')) {
+          wv.executeJavaScript(
+            'window.dispatchEvent(new MessageEvent("message",{data:{type:"SF_EDU_YT_SYNC",extra:'
+            + JSON.stringify(DB.eduYoutubeExtra || [])
+            + '}}));'
+          ).catch(() => {});
+        }
+      } catch (_) {}
+    }
+
+    let webviewGuardInjecting = false;
+    async function injectWebviewYoutubeGuard(wv) {
+      if (!isWebViewEl(wv) || !isEduYoutubeEnabled() || webviewGuardInjecting) return;
+      const url = wv.getURL() || '';
+      if (!isYoutubePageUrl(url) || url.includes('youtube-study.html')) return;
+      try {
+        const installed = await wv.executeJavaScript('!!window.__sfYtGuardInstalled', true);
+        if (installed) return;
+        webviewGuardInjecting = true;
+        const scriptUrl = new URL('youtube-web-guard.js', window.location.href).href;
+        const res = await fetch(scriptUrl);
+        if (!res.ok) return;
+        const code = await res.text();
+        await wv.executeJavaScript(code + ';window.__sfYtGuardInstalled=true;');
+      } catch (_) {
+      } finally {
+        webviewGuardInjecting = false;
+      }
     }
 
     function registerStudyTab() {
@@ -642,6 +723,10 @@
     }
 
     async function forcePcUnlock() {
+      if (desktopAvailable()) {
+        try { await studyflowDesktop.forceUnlock(); } catch (_) { }
+        return;
+      }
       if (!extAvailable()) return;
       for (let i = 0; i < 8; i++) {
         try {
@@ -705,11 +790,15 @@
     }
 
     function notifyChromeFocusLost() {
-      if (!shouldReportFocusLost() || !extAvailable()) return;
+      if (!shouldReportFocusLost()) return;
       const now = Date.now();
       if (now - lastFocusPingAt < 200) return;
       lastFocusPingAt = now;
-      chrome.runtime.sendMessage({ type: 'CHROME_FOCUS_LOST' }).catch(() => {});
+      if (extAvailable()) {
+        chrome.runtime.sendMessage({ type: 'CHROME_FOCUS_LOST' }).catch(() => {});
+      } else {
+        handleAppSwitchAttempt();
+      }
     }
 
     function startPageFocusPoll() {
@@ -1512,6 +1601,8 @@
         saveDB();
         inp.value = '';
         renderEduYoutubeSection();
+        const wv = document.getElementById('webView');
+        if (desktopAvailable() && wv) syncWebviewStudyData(wv);
         showToast('Added ' + (ch.name || '@' + ch.handle));
       } catch (_) {
         showToast('Could not add channel');
@@ -1528,6 +1619,8 @@
       );
       saveDB();
       renderEduYoutubeSection();
+      const wv = document.getElementById('webView');
+      if (desktopAvailable() && wv) syncWebviewStudyData(wv);
       showToast('Removed channel');
     }
 
@@ -1687,11 +1780,36 @@
       const el = document.getElementById('pcLockStatus');
       const inp = document.getElementById('pcLockExtIdInput');
       const afterDl = document.getElementById('pcLockAfterDl');
+      const installBox = document.getElementById('pcLockInstallBox');
+      if (desktopAvailable()) {
+        if (installBox) installBox.style.display = 'none';
+        if (!el) return;
+        try {
+          const res = await studyflowDesktop.getPcLockStatus();
+          if (res?.installed && res?.ok) {
+            el.className = 'pc-lock-status ready';
+            el.textContent = isRun && !isBreak && res.locked
+              ? 'StudyFlow App — Alt+Tab block is ACTIVE.'
+              : 'StudyFlow App — Alt+Tab blocks automatically when you start focus.';
+            setPcLockInstallUi(true);
+          } else {
+            el.className = 'pc-lock-status missing';
+            el.textContent = 'Desktop lock helper missing — rebuild with Build-Desktop.ps1.';
+            setPcLockInstallUi(false);
+          }
+        } catch (_) {
+          el.className = 'pc-lock-status ready';
+          el.textContent = 'StudyFlow App — no Chrome or extension needed.';
+          setPcLockInstallUi(true);
+        }
+        return;
+      }
+      if (installBox) installBox.style.display = '';
       if (inp && extAvailable()) inp.value = chrome.runtime.id;
       if (!el) return;
       if (!extAvailable()) {
         el.className = 'pc-lock-status missing';
-        el.textContent = 'Open StudyFlow from chrome://extensions.';
+        el.textContent = 'Open StudyFlow from chrome://extensions — or use StudyFlow-App.exe (no Chrome).';
         setPcLockInstallUi(false);
         return;
       }
@@ -1872,6 +1990,8 @@
         escCount++;
         const secs = Math.round(awayMs / 1000);
         triggerBlockedRoast(caughtDomain, secs);
+      } else if (!extAvailable() && awayMs > 1200 && shouldReportFocusLost()) {
+        handleAppSwitchAttempt();
       }
     }
 
@@ -2471,6 +2591,28 @@ PERSONALITY & RULES:
     // ─── WEB BROWSER (Google home + any site, blocklist enforced) ─────
     const GOOGLE_HOME = 'https://www.google.com/webhp?igu=1';
     let webInited = false;
+
+    function isWebViewEl(el) {
+      return el && el.tagName && el.tagName.toLowerCase() === 'webview';
+    }
+
+    /** Desktop app uses <webview> (iframes show blank for Google/sites). */
+    function getWebBrowserEl() {
+      const iframe = document.getElementById('webFrame');
+      const wv = document.getElementById('webView');
+      if (desktopAvailable() && wv) {
+        if (iframe) iframe.classList.add('hidden');
+        wv.classList.remove('hidden');
+        return wv;
+      }
+      if (wv) {
+        wv.classList.add('hidden');
+        try { wv.stop(); } catch (_) {}
+        wv.removeAttribute('src');
+      }
+      if (iframe) iframe.classList.remove('hidden');
+      return iframe;
+    }
     let webHistory = [];
     let webHistIdx = -1;
     let webCurrentUrl = '';
@@ -2539,11 +2681,21 @@ PERSONALITY & RULES:
       }
     }
 
+    function updateWebEmbedHint() {
+      const hint = document.getElementById('webEmbedHint');
+      if (!hint) return;
+      const needsBridge = !desktopAvailable() && !extAvailable();
+      hint.classList.toggle('hidden', !needsBridge);
+    }
+
     function updateWebNavButtons() {
       const back = document.getElementById('webBack');
       const fwd = document.getElementById('webForward');
-      if (back) back.disabled = webHistIdx <= 0;
-      if (fwd) fwd.disabled = webHistIdx < 0 || webHistIdx >= webHistory.length - 1;
+      const el = document.getElementById('webView') && desktopAvailable() ? getWebBrowserEl() : null;
+      const canBack = webHistIdx > 0 || (el && isWebViewEl(el) && el.canGoBack && el.canGoBack());
+      const canFwd = (webHistIdx >= 0 && webHistIdx < webHistory.length - 1) || (el && isWebViewEl(el) && el.canGoForward && el.canGoForward());
+      if (back) back.disabled = !canBack;
+      if (fwd) fwd.disabled = !canFwd;
     }
 
     function webOpenInNewTab() {
@@ -2596,7 +2748,8 @@ PERSONALITY & RULES:
     }
 
     function openGoogleHome() {
-      webLoadUrl(GOOGLE_HOME, { push: true, displayInBar: '' });
+      const home = desktopAvailable() ? 'https://www.google.com/' : GOOGLE_HOME;
+      webLoadUrl(home, { push: true, displayInBar: '' });
       registerStudyTab();
       pushBlockedDomainsToBackground();
     }
@@ -2633,7 +2786,7 @@ PERSONALITY & RULES:
         el.dataset.redirect = redirect || youtubeHubUrl();
       }
       setWebLoading(false);
-      const frame = document.getElementById('webFrame');
+      const frame = getWebBrowserEl();
       if (frame) { frame.classList.add('hidden'); frame.removeAttribute('src'); }
     }
 
@@ -2657,25 +2810,29 @@ PERSONALITY & RULES:
       }
       if (!opts?.skipYoutubeCheck && isEduYoutubeEnabled()) {
         const yt = await checkYoutubeForWeb(url);
-        if (!yt.allowed) {
-          if (yt.redirect) {
-            webLoadUrl(yt.redirect, { push, displayInBar: 'Study YouTube', skipYoutubeCheck: true });
-            return;
-          }
-          showYoutubeBlocked(yt.reason, yt.channelName, yt.redirect);
-          return;
-        }
+        if (!(await applyYoutubeGuardResult(yt, null))) return;
       }
       hideWebBlockedOverlay();
       hideYoutubeBlocked();
       setWebLoading(true);
-      const frame = document.getElementById('webFrame');
+      const frame = getWebBrowserEl();
+      if (isWebViewEl(frame)) await syncWebviewStudyData(frame);
       const urlInp = document.getElementById('webUrlInp');
       const barVal = opts && opts.displayInBar !== undefined ? opts.displayInBar : url;
       if (urlInp) urlInp.value = barVal;
       if (frame) {
         frame.classList.remove('hidden');
-        frame.src = url;
+        if (isWebViewEl(frame)) {
+          try { frame.loadURL(url); } catch (_) { frame.src = url; }
+        } else {
+          frame.src = url;
+        }
+      }
+      if (isWebViewEl(frame) && isYoutubePageUrl(url)) {
+        frame.addEventListener('dom-ready', function onYtReady() {
+          injectWebviewYoutubeGuard(frame);
+          syncWebviewStudyData(frame);
+        }, { once: true });
       }
       webCurrentUrl = url;
       updateWebUrlFieldForContext(url);
@@ -2700,8 +2857,13 @@ PERSONALITY & RULES:
         webLoadUrl(url, { push: false });
         return;
       }
-      const frame = document.getElementById('webFrame');
+      const frame = getWebBrowserEl();
       if (!frame) return;
+      if (isWebViewEl(frame) && frame.canGoBack()) {
+        frame.goBack();
+        updateWebNavButtons();
+        return;
+      }
       try {
         frame.contentWindow.history.back();
         frame.dataset.canForward = '1';
@@ -2720,8 +2882,13 @@ PERSONALITY & RULES:
         webLoadUrl(url, { push: false });
         return;
       }
-      const frame = document.getElementById('webFrame');
+      const frame = getWebBrowserEl();
       if (!frame) return;
+      if (isWebViewEl(frame) && frame.canGoForward()) {
+        frame.goForward();
+        updateWebNavButtons();
+        return;
+      }
       try {
         frame.contentWindow.history.forward();
         updateWebNavButtons();
@@ -2739,8 +2906,12 @@ PERSONALITY & RULES:
       }
       hideWebBlockedOverlay();
       setWebLoading(true);
-      const frame = document.getElementById('webFrame');
+      const frame = getWebBrowserEl();
       if (!frame) return;
+      if (isWebViewEl(frame)) {
+        try { frame.reload(); } catch (_) { frame.loadURL(webCurrentUrl); }
+        return;
+      }
       try {
         frame.contentWindow.location.reload();
       } catch (_) {
@@ -2749,13 +2920,17 @@ PERSONALITY & RULES:
     }
 
     async function onWebFrameLoad() {
-      const frame = document.getElementById('webFrame');
+      const frame = getWebBrowserEl();
       if (!frame) return;
       setWebLoading(false);
       let href = '';
-      try { href = frame.contentWindow.location.href; } catch (_) {
-        updateWebNavButtons();
-        return;
+      if (isWebViewEl(frame)) {
+        try { href = frame.getURL() || ''; } catch (_) { href = ''; }
+      } else {
+        try { href = frame.contentWindow.location.href; } catch (_) {
+          updateWebNavButtons();
+          return;
+        }
       }
       if (!href || href === 'about:blank') return;
 
@@ -2777,14 +2952,11 @@ PERSONALITY & RULES:
 
       if (isEduYoutubeEnabled() && isYoutubePageUrl(href)) {
         const yt = await checkYoutubeForWeb(href);
-        if (!yt.allowed) {
-          if (yt.redirect) {
-            webLoadUrl(yt.redirect, { push: false, displayInBar: 'Study YouTube', skipYoutubeCheck: true });
-            return;
-          }
-          showYoutubeBlocked(yt.reason, yt.channelName, yt.redirect);
-          return;
-        }
+        if (!(await applyYoutubeGuardResult(yt, frame))) return;
+        if (isWebViewEl(frame)) injectWebviewYoutubeGuard(frame);
+      }
+      if (isWebViewEl(frame) && href.includes('youtube-study.html')) {
+        syncWebviewStudyData(frame);
       }
 
       hideWebBlockedOverlay();
@@ -2815,11 +2987,47 @@ PERSONALITY & RULES:
     function initWebBrowser() {
       if (webInited) return;
       webInited = true;
+      updateWebEmbedHint();
       const frame = document.getElementById('webFrame');
+      const wv = document.getElementById('webView');
       if (frame) frame.addEventListener('load', onWebFrameLoad);
-      window.addEventListener('message', (e) => {
+      if (wv) {
+        wv.addEventListener('will-navigate', async (e) => {
+          if (!e.url || e.url.includes('youtube-study.html')) return;
+          const ok = await guardWebviewYoutubeUrl(e.url, wv);
+          if (!ok) e.preventDefault();
+        });
+        wv.addEventListener('did-start-navigation', async (e) => {
+          if (!e.url || !e.isInPlace || e.url.includes('youtube-study.html')) return;
+          await guardWebviewYoutubeUrl(e.url, wv);
+        });
+        wv.addEventListener('did-finish-load', onWebFrameLoad);
+        wv.addEventListener('did-navigate', onWebFrameLoad);
+        wv.addEventListener('did-navigate-in-page', onWebFrameLoad);
+        wv.addEventListener('dom-ready', () => {
+          injectWebviewYoutubeGuard(wv);
+          if ((wv.getURL() || '').includes('youtube-study.html')) syncWebviewStudyData(wv);
+        });
+        wv.addEventListener('did-fail-load', (e) => {
+          if (e.isMainFrame === false) return;
+          setWebLoading(false);
+          if (e.errorCode === -106 || e.errorDescription === 'ERR_INTERNET_DISCONNECTED') {
+            showToast('No internet — check your Wi‑Fi, then tap Reload.');
+          }
+        });
+      }
+      getWebBrowserEl();
+      window.addEventListener('message', async (e) => {
         if (e.data?.type === 'SF_OPEN_YOUTUBE' && e.data.url) {
           webLoadUrl(e.data.url, { push: true, displayInBar: e.data.url, skipYoutubeCheck: false });
+          return;
+        }
+        if (e.data?.type === 'SF_YT_GUARD_CHECK' && e.data.url) {
+          const yt = await checkYoutubeForWeb(e.data.url);
+          const target = e.source;
+          if (target && target.postMessage) {
+            target.postMessage({ type: 'SF_YT_GUARD_RESULT', reqId: e.data.reqId, result: yt }, '*');
+          }
         }
       });
       updateWebShieldBadge();
@@ -2848,6 +3056,7 @@ PERSONALITY & RULES:
       if (name === 'web') {
         hideEscWarn();
         initWebBrowser();
+        updateWebEmbedHint();
         updateWebShieldBadge();
         registerStudyTab();
         pushBlockedDomainsToBackground();

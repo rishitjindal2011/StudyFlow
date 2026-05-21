@@ -76,6 +76,12 @@
     }
   });
 
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'SF_EDU_YT_SYNC') {
+      renderGrid(Array.isArray(e.data.extra) ? e.data.extra : []);
+    }
+  });
+
   window.addEventListener('storage', (e) => {
     if (e.key === 'sf5') refreshGrid();
   });

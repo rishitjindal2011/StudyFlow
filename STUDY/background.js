@@ -119,11 +119,23 @@ function isGooglePageUrl(url) {
 }
 
 // ── Web tab: strip frame-blocking headers + blocklist redirects (tab-scoped) ──
+async function getStudyflowTabForWebRules() {
+  if (studyflowTabId != null) {
+    try {
+      const t = await chrome.tabs.get(studyflowTabId);
+      if (t?.id) return t;
+    } catch (_) {
+      studyflowTabId = null;
+    }
+  }
+  return findStudyflowTab();
+}
+
 async function updateWebTabRules() {
   const removeIds = [FRAME_EMBED_RULE_ID];
   for (let i = WEB_BLOCK_RULE_BASE; i <= WEB_BLOCK_RULE_MAX; i++) removeIds.push(i);
 
-  const tab = await findStudyflowTab();
+  const tab = await getStudyflowTabForWebRules();
   const addRules = [];
 
   if (tab?.id) {

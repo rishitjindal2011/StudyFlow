@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="StudyFlow">
   <title>StudyFlow — Focus & Study</title>
   <link rel="icon" href="studyflow-logo.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com/">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=Dancing+Script:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
@@ -2099,6 +2100,14 @@
       background: #fff;
     }
 
+    webview.web-frame {
+      display: inline-flex;
+    }
+
+    webview.web-frame.hidden {
+      display: none;
+    }
+
     .web-loading {
       position: absolute;
       inset: 0;
@@ -2114,6 +2123,26 @@
     }
 
     .web-loading.hidden {
+      display: none;
+    }
+
+    .web-embed-hint {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      z-index: 2;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #3c4043;
+      background: rgba(255, 248, 220, 0.96);
+      border: 1px solid rgba(255, 193, 7, 0.45);
+      pointer-events: none;
+    }
+
+    .web-embed-hint.hidden {
       display: none;
     }
 
@@ -4555,8 +4584,13 @@
               </div>
               <div class="web-body">
                 <div class="web-loading" id="webLoading">Loading Google…</div>
+                <div class="web-embed-hint hidden" id="webEmbedHint">
+                  In-app sites need the <strong>StudyFlow desktop app</strong> or the <strong>Chrome extension</strong> (open StudyFlow from the extension, not only GitHub Pages). You can still use <strong>↗ Open in new tab</strong>.
+                </div>
                 <iframe class="web-frame" id="webFrame" title="Web browser" referrerpolicy="no-referrer-when-downgrade"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"></iframe>
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-top-navigation-by-user-activation allow-presentation"></iframe>
+                <webview class="web-frame hidden" id="webView" partition="persist:studyflowweb" allowpopups
+                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"></webview>
                 <div class="web-blocked" id="webBlocked">
                   <div class="web-blocked-icon">🚫</div>
                   <h2>Site blocked</h2>

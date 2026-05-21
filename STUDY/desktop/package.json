@@ -1,0 +1,49 @@
+{
+  "name": "studyflow-desktop",
+  "version": "1.0.0",
+  "description": "StudyFlow — standalone Windows app (no Chrome)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable",
+    "dist:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./Build-Installer.ps1",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.studyflow.app",
+    "productName": "StudyFlow",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lock-control.js",
+      "static-server.js",
+      "embed-session.js"
+    ],
+    "extraResources": [
+      {
+        "from": "..",
+        "to": "studyflow-app",
+        "filter": [
+          "**/*",
+          "!desktop/**",
+          "!native-lock/build/**",
+          "!**/.git/**"
+        ]
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [{ "target": "portable", "arch": ["x64"] }]
+    },
+    "portable": {
+      "artifactName": "StudyFlow-App.exe"
+    }
+  }
+}
