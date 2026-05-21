@@ -57,6 +57,37 @@ try {
   } else { throw }
 }
 
+function Remove-ExistingReleaseAsset($fileName) {
+  try {
+    $assets = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/$($release.id)/assets" -Headers $apiHeaders
+    foreach ($a in @($assets)) {
+      if ($a.name -eq $fileName) {
+        Write-Host "Removing existing release asset: $fileName" -ForegroundColor Yellow
+        Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/assets/$($a.id)" -Method Delete -Headers $apiHeaders | Out-Null
+        Start-Sleep -Seconds 2
+      }
+    }
+  } catch {
+    Write-Host "  Could not list/delete old asset (continuing): $($_.Exception.Message)" -ForegroundColor DarkYellow
+  }
+}
+
+function Upload-Asset-Rest($filePath) {
+  $fileName = [IO.Path]::GetFileName($filePath)
+  $encoded = [Uri]::EscapeDataString($fileName)
+  $uploadUri = "https://uploads.github.com/repos/$Repo/releases/$($release.id)/assets?name=$encoded"
+  $mb = [math]::Round((Get-Item $filePath).Length / 1MB, 1)
+  Write-Host "Uploading $fileName ($mb MB) via Invoke-RestMethod ..." -ForegroundColor Cyan
+
+  $uploadHeaders = @{
+    Authorization          = "Bearer $Token"
+    Accept                 = 'application/vnd.github+json'
+    'X-GitHub-Api-Version' = '2022-11-28'
+  }
+  Invoke-RestMethod -Uri $uploadUri -Method Post -Headers $uploadHeaders -InFile $filePath -ContentType 'application/octet-stream' | Out-Null
+  return $true
+}
+
 function Upload-Asset-Curl($filePath) {
   $fileName = [IO.Path]::GetFileName($filePath)
   $encoded = [Uri]::EscapeDataString($fileName)
@@ -88,15 +119,16 @@ function Upload-Asset-HttpClient($filePath) {
   $mb = [math]::Round((Get-Item $filePath).Length / 1MB, 1)
   Write-Host "Uploading $fileName ($mb MB) via HttpClient ..." -ForegroundColor Cyan
 
-  $handler = [System.Net.Http.HttpClientHandler]::new()
-  $client = [System.Net.Http.HttpClient]::new($handler)
+  Add-Type -AssemblyName System.Net.Http
+  $handler = New-Object System.Net.Http.HttpClientHandler
+  $client = New-Object System.Net.Http.HttpClient($handler)
   $client.Timeout = [TimeSpan]::FromHours(3)
-  $client.DefaultRequestHeaders.Add('Authorization', "Bearer $Token")
-  $client.DefaultRequestHeaders.Add('Accept', 'application/vnd.github+json')
+  [void]$client.DefaultRequestHeaders.TryAddWithoutValidation('Authorization', "Bearer $Token")
+  [void]$client.DefaultRequestHeaders.TryAddWithoutValidation('Accept', 'application/vnd.github+json')
   try {
     $stream = [System.IO.File]::OpenRead($filePath)
     try {
-      $content = [System.Net.Http.StreamContent]::new($stream)
+      $content = New-Object System.Net.Http.StreamContent($stream)
       $content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::new('application/octet-stream')
       $response = $client.PostAsync($uploadUri, $content).GetAwaiter().GetResult()
       if (-not $response.IsSuccessStatusCode) {
@@ -113,22 +145,37 @@ function Upload-Asset-HttpClient($filePath) {
 }
 
 function Upload-Asset($filePath) {
+  $fileName = [IO.Path]::GetFileName($filePath)
+  Remove-ExistingReleaseAsset $fileName
+
   for ($try = 1; $try -le 3; $try++) {
     try {
-      if (Upload-Asset-Curl $filePath) {
-        Write-Host "  Uploaded: $([IO.Path]::GetFileName($filePath))" -ForegroundColor Green
-        return
-      }
-      if (Upload-Asset-HttpClient $filePath) {
-        Write-Host "  Uploaded: $([IO.Path]::GetFileName($filePath))" -ForegroundColor Green
+      if (Upload-Asset-Rest $filePath) {
+        Write-Host "  Uploaded: $fileName" -ForegroundColor Green
         return
       }
     } catch {
-      Write-Host "  Attempt $try failed: $($_.Exception.Message)" -ForegroundColor Yellow
-      if ($try -lt 3) { Start-Sleep -Seconds (5 * $try) }
+      Write-Host "  Invoke-RestMethod attempt $try failed: $($_.Exception.Message)" -ForegroundColor Yellow
     }
+    try {
+      if (Upload-Asset-Curl $filePath) {
+        Write-Host "  Uploaded: $fileName" -ForegroundColor Green
+        return
+      }
+    } catch {
+      Write-Host "  curl attempt $try failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    try {
+      if (Upload-Asset-HttpClient $filePath) {
+        Write-Host "  Uploaded: $fileName" -ForegroundColor Green
+        return
+      }
+    } catch {
+      Write-Host "  HttpClient attempt $try failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    if ($try -lt 3) { Start-Sleep -Seconds (5 * $try) }
   }
-  throw "Upload failed after 3 attempts: $([IO.Path]::GetFileName($filePath))"
+  throw "Upload failed after 3 attempts: $fileName"
 }
 
 Upload-Asset $setup
