@@ -1,0 +1,6 @@
+dist/
+dist-bundle/
+build/
+*.spec
+__pycache__/
+com.studyflow.lock.installed.json
