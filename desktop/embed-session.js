@@ -8,7 +8,8 @@ const STRIP_HEADERS = new Set([
   'content-security-policy-report-only',
   'cross-origin-opener-policy',
   'cross-origin-embedder-policy',
-  'cross-origin-resource-policy'
+  'cross-origin-resource-policy',
+  'permissions-policy'
 ]);
 
 function stripFrameBlockingHeaders(headers) {

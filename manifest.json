@@ -31,6 +31,11 @@
       ],
       "js": ["studyflow-page-bridge.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["chrome-extension://*/*studyflow.html*"],
+      "js": ["studyflow-page-bridge.js"],
+      "run_at": "document_start"
     }
   ],
   "action": {
@@ -48,6 +53,7 @@
     {
       "resources": [
         "blocked.html",
+        "web-embed.html",
         "youtube-study.html",
         "youtube-study.js",
         "youtube-study.css",

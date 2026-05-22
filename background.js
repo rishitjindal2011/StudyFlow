@@ -29,6 +29,7 @@ const STUDYFLOW_PAGE = 'studyflow.html';
 const NATIVE_LOCK_HOST = 'com.studyflow.lock';
 const BLOCKED_PAGE = 'blocked.html';
 const FRAME_EMBED_RULE_ID = 50;
+const FRAME_EMBED_EXT_RULE_ID = 51;
 const WEB_BLOCK_RULE_BASE = 3000;
 const WEB_BLOCK_RULE_MAX = 3999;
 
@@ -82,7 +83,8 @@ const FRAME_HEADER_ACTION = {
     { header: 'content-security-policy-report-only', operation: 'remove' },
     { header: 'cross-origin-opener-policy', operation: 'remove' },
     { header: 'cross-origin-embedder-policy', operation: 'remove' },
-    { header: 'cross-origin-resource-policy', operation: 'remove' }
+    { header: 'cross-origin-resource-policy', operation: 'remove' },
+    { header: 'permissions-policy', operation: 'remove' }
   ]
 };
 
@@ -135,30 +137,30 @@ async function getStudyflowTabForWebRules() {
 }
 
 async function updateWebTabRules() {
-  const removeIds = [FRAME_EMBED_RULE_ID];
+  const removeIds = [FRAME_EMBED_RULE_ID, FRAME_EMBED_EXT_RULE_ID];
   for (let i = WEB_BLOCK_RULE_BASE; i <= WEB_BLOCK_RULE_MAX; i++) removeIds.push(i);
 
   const tab = await getStudyflowTabForWebRules();
   const addRules = [];
 
+  addRules.push({
+    id: FRAME_EMBED_EXT_RULE_ID,
+    priority: 1,
+    action: FRAME_HEADER_ACTION,
+    condition: {
+      resourceTypes: ['sub_frame'],
+      initiatorDomains: [chrome.runtime.id]
+    }
+  });
+
   if (tab?.id) {
     addRules.push({
       id: FRAME_EMBED_RULE_ID,
-      priority: 1,
+      priority: 2,
       action: FRAME_HEADER_ACTION,
       condition: {
         resourceTypes: ['sub_frame'],
         tabIds: [tab.id]
-      }
-    });
-  } else {
-    addRules.push({
-      id: FRAME_EMBED_RULE_ID,
-      priority: 1,
-      action: FRAME_HEADER_ACTION,
-      condition: {
-        resourceTypes: ['sub_frame'],
-        initiatorDomains: [chrome.runtime.id]
       }
     });
   }
@@ -287,25 +289,30 @@ function notifyWebFrameNav(url) {
   }
 }
 
-/** Stop the iframe from loading the URL itself (avoids X-Frame-Options errors); parent loads via webLoadUrl. */
-async function abortSubframeNavigation(tabId, frameId) {
-  if (!tabId || frameId === undefined) return;
+/** Top-level iframe in studyflow.html (#webFrame), including nested frames inside it (e.g. Google). */
+async function isInsideStudyflowWebBrowser(tabId, frameId) {
+  if (!(await isStudyflowTabId(tabId))) return false;
+  if (frameId === 0) return false;
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId, frameIds: [frameId] },
-      func: () => {
-        try { window.stop(); } catch (_) {}
-        try {
-          if (location.href !== 'about:blank') location.replace('about:blank');
-        } catch (_) {}
-      }
-    });
-  } catch (_) {}
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    let f = frames.find((x) => x.frameId === frameId);
+    if (!f) return false;
+    while (f.parentFrameId !== 0) {
+      f = frames.find((x) => x.frameId === f.parentFrameId);
+      if (!f) return false;
+    }
+    const u = f.url || '';
+    if (u.includes('youtube-study.html')) return false;
+    if (u.includes('blocked.html') || u.includes('web-embed.html')) return true;
+    if (u.startsWith('http://') || u.startsWith('https://')) return true;
+    return u === 'about:blank' || !u;
+  } catch (_) {
+    return false;
+  }
 }
 
 async function handleStudyflowSubframeNav(details) {
-  if (!(await isStudyflowTabId(details.tabId))) return;
-  if (details.parentFrameId !== 0) return;
+  if (!(await isInsideStudyflowWebBrowser(details.tabId, details.frameId))) return;
   let url = resolveGoogleRedirectUrl(details.url);
 
   if (isDomainOnBlocklist(url)) {
@@ -334,7 +341,6 @@ async function handleStudyflowSubframeNav(details) {
 
   if (isGooglePageUrl(url)) return;
 
-  await abortSubframeNavigation(details.tabId, details.frameId);
   notifyWebFrameNav(url);
 }
 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyFlow Web</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #09090e; }
+    #site { border: 0; width: 100%; height: 100%; display: block; background: #fff; }
+  </style>
+</head>
+<body>
+  <iframe id="site" title="Website"
+    referrerpolicy="no-referrer-when-downgrade"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-top-navigation allow-top-navigation-by-user-activation allow-presentation"></iframe>
+  <script>
+    (function () {
+      function targetFromQuery() {
+        const p = new URLSearchParams(location.search);
+        let u = p.get('u') || p.get('url') || '';
+        if (!u) return '';
+        try { u = decodeURIComponent(u); } catch (_) {}
+        return /^https?:\/\//i.test(u) ? u : '';
+      }
+      const el = document.getElementById('site');
+      const start = targetFromQuery();
+      if (start) el.src = start;
+      window.addEventListener('message', function (e) {
+        if (!e.data || e.data.type !== 'SF_EMBED_NAV' || !e.data.url) return;
+        if (/^https?:\/\//i.test(e.data.url)) el.src = e.data.url;
+      });
+    })();
+  </script>
+</body>
+</html>
