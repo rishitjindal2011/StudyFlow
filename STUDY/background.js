@@ -225,7 +225,7 @@ async function isStudyflowYoutubeSubframe(tabId, frameId) {
     if (host !== 'youtube.com' && host !== 'youtu.be' && host !== 'm.youtube.com') return false;
     const parent = frames.find((f) => f.frameId === frame.parentFrameId);
     if (!parent?.url) return false;
-    return isExtensionUrl(parent.url, STUDYFLOW_PAGE);
+    return isStudyflowPageUrl(parent.url);
   } catch (_) {
     return false;
   }
@@ -282,7 +282,10 @@ async function handleStudyflowSubframeNav(details) {
 
   if (isDomainOnBlocklist(url)) {
     try {
-      notifyWebFrameBlocked(new URL(url).hostname.replace(/^www\./, ''));
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      const blockedUrl = chrome.runtime.getURL(BLOCKED_PAGE) + '?domain=' + encodeURIComponent(host) + '&embed=1';
+      await redirectYoutubeSubframe(details.tabId, details.frameId, blockedUrl);
+      notifyWebFrameBlocked(host);
     } catch (_) {}
     return;
   }
@@ -309,7 +312,7 @@ async function handleStudyflowSubframeNav(details) {
 async function isStudyflowTabId(tabId) {
   try {
     const tab = await chrome.tabs.get(tabId);
-    return isExtensionUrl(tab.url, STUDYFLOW_PAGE);
+    return isStudyflowPageUrl(tab.url);
   } catch (_) {
     return false;
   }

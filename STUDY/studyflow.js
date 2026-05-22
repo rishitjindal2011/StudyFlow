@@ -2840,6 +2840,10 @@ PERSONALITY & RULES:
 
     function handleWebFrameBlocked(domain) {
       if (!domain) return;
+      const frame = getWebBrowserEl();
+      if (frame && !isWebViewEl(frame)) {
+        try { frame.src = 'about:blank'; } catch (_) {}
+      }
       showWebBlockedOverlay(domain);
       if (isRun && !isBreak && !enforcementPaused) {
         if (domain !== lastCaughtDomain) {
