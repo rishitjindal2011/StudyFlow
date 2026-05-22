@@ -29,7 +29,10 @@ const STUDYFLOW_PAGE = 'studyflow.html';
 const NATIVE_LOCK_HOST = 'com.studyflow.lock';
 const BLOCKED_PAGE = 'blocked.html';
 const FRAME_EMBED_RULE_ID = 50;
-const FRAME_EMBED_EXT_RULE_ID = 51;
+const FRAME_EMBED_INIT_RULE_ID = 52;
+const SESSION_EMBED_RULE_ID = 10001;
+const SESSION_EMBED_UA_RULE_ID = 10002;
+const WEB_BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
 const WEB_BLOCK_RULE_BASE = 3000;
 const WEB_BLOCK_RULE_MAX = 3999;
 
@@ -88,6 +91,77 @@ const FRAME_HEADER_ACTION = {
   ]
 };
 
+const FRAME_REQUEST_UA_ACTION = {
+  type: 'modifyHeaders',
+  requestHeaders: [
+    { header: 'User-Agent', operation: 'set', value: WEB_BROWSER_UA }
+  ]
+};
+
+/** Same as desktop embed-session.js (subFrame + optional mainFrame in webview partition). */
+async function applyWebTabSessionRules(tabId) {
+  if (!tabId || !chrome.declarativeNetRequest?.updateSessionRules) return;
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({
+      tabId,
+      removeRuleIds: [SESSION_EMBED_RULE_ID, SESSION_EMBED_UA_RULE_ID],
+      addRules: [
+        {
+          id: SESSION_EMBED_UA_RULE_ID,
+          priority: 1,
+          action: FRAME_REQUEST_UA_ACTION,
+          condition: {
+            resourceTypes: ['sub_frame'],
+            regexFilter: '^https?://',
+            isUrlFilterCaseSensitive: false
+          }
+        },
+        {
+          id: SESSION_EMBED_RULE_ID,
+          priority: 2,
+          action: FRAME_HEADER_ACTION,
+          condition: { resourceTypes: ['sub_frame'] }
+        }
+      ]
+    });
+  } catch (e) {
+    console.warn('StudyFlow: session embed rules failed', e);
+  }
+}
+
+function isGoogleUrl(url) {
+  try {
+    const h = new URL(url).hostname.replace(/^www\./, '');
+    return h === 'google.com' || h.endsWith('.google.com');
+  } catch (_) {
+    return false;
+  }
+}
+
+async function getWebRootFrameUrl(tabId, frameId) {
+  try {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    let f = frames.find((x) => x.frameId === frameId);
+    while (f && f.parentFrameId !== 0) {
+      f = frames.find((x) => x.frameId === f.parentFrameId);
+      if (!f) return '';
+    }
+    return f?.url || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Desktop webview navigates freely inside the guest — only hijack when leaving Google / opening new targets. */
+async function shouldHijackWebNav(tabId, frameId, destUrl) {
+  const rootUrl = await getWebRootFrameUrl(tabId, frameId);
+  if (!rootUrl || rootUrl === 'about:blank') return true;
+  if (rootUrl.includes('blocked.html') || rootUrl.includes('web-embed.html')) return true;
+  const rootOnGoogle = isGooglePageUrl(rootUrl) || isGoogleUrl(rootUrl);
+  if (rootOnGoogle) return !isGooglePageUrl(destUrl) && !isGoogleUrl(destUrl);
+  return false;
+}
+
 /** Unwrap google.com/url?q=… redirect links */
 function resolveGoogleRedirectUrl(url) {
   if (!url) return url;
@@ -137,23 +211,26 @@ async function getStudyflowTabForWebRules() {
 }
 
 async function updateWebTabRules() {
-  const removeIds = [FRAME_EMBED_RULE_ID, FRAME_EMBED_EXT_RULE_ID];
+  const removeIds = [FRAME_EMBED_RULE_ID, FRAME_EMBED_INIT_RULE_ID];
   for (let i = WEB_BLOCK_RULE_BASE; i <= WEB_BLOCK_RULE_MAX; i++) removeIds.push(i);
 
   const tab = await getStudyflowTabForWebRules();
   const addRules = [];
 
-  addRules.push({
-    id: FRAME_EMBED_EXT_RULE_ID,
-    priority: 1,
-    action: FRAME_HEADER_ACTION,
-    condition: {
-      resourceTypes: ['sub_frame'],
-      initiatorDomains: [chrome.runtime.id]
-    }
-  });
+  try {
+    addRules.push({
+      id: FRAME_EMBED_INIT_RULE_ID,
+      priority: 1,
+      action: FRAME_HEADER_ACTION,
+      condition: {
+        resourceTypes: ['sub_frame'],
+        initiatorDomains: [chrome.runtime.id]
+      }
+    });
+  } catch (_) {}
 
   if (tab?.id) {
+    await applyWebTabSessionRules(tab.id);
     addRules.push({
       id: FRAME_EMBED_RULE_ID,
       priority: 2,
@@ -267,12 +344,14 @@ async function ensureYoutubeGuard(details) {
 }
 
 function notifyYoutubeBlockedInWeb(yt) {
-  chrome.runtime.sendMessage({
+  const msg = {
     type: 'WEB_YOUTUBE_BLOCKED',
     reason: yt.reason || 'Not a study channel',
     channelName: yt.channelName || '',
     redirect: yt.redirect || youtubeHubUrl()
-  }).catch(() => {});
+  };
+  chrome.runtime.sendMessage(msg).catch(() => {});
+  if (studyflowTabId != null) chrome.tabs.sendMessage(studyflowTabId, msg).catch(() => {});
 }
 
 function notifyWebFrameNav(url) {
@@ -289,7 +368,7 @@ function notifyWebFrameNav(url) {
   }
 }
 
-/** Top-level iframe in studyflow.html (#webFrame), including nested frames inside it (e.g. Google). */
+/** Any frame inside StudyFlow #webFrame (including nested Google iframes). */
 async function isInsideStudyflowWebBrowser(tabId, frameId) {
   if (!(await isStudyflowTabId(tabId))) return false;
   if (frameId === 0) return false;
@@ -303,7 +382,7 @@ async function isInsideStudyflowWebBrowser(tabId, frameId) {
     }
     const u = f.url || '';
     if (u.includes('youtube-study.html')) return false;
-    if (u.includes('blocked.html') || u.includes('web-embed.html')) return true;
+    if (u.includes('web-embed.html') || u.includes('blocked.html')) return true;
     if (u.startsWith('http://') || u.startsWith('https://')) return true;
     return u === 'about:blank' || !u;
   } catch (_) {
@@ -340,6 +419,8 @@ async function handleStudyflowSubframeNav(details) {
   } catch (_) { }
 
   if (isGooglePageUrl(url)) return;
+
+  if (!(await shouldHijackWebNav(details.tabId, details.frameId, url))) return;
 
   notifyWebFrameNav(url);
 }
@@ -510,6 +591,13 @@ function isStudyflowPageUrl(url) {
   if (isExtensionUrl(url, STUDYFLOW_PAGE)) return true;
   return /studyflow\.html/i.test(url);
 }
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!tab?.url || !isStudyflowPageUrl(tab.url)) return;
+  studyflowTabId = tabId;
+  if (tab.windowId) studyflowWindowId = tab.windowId;
+  if (changeInfo.status === 'complete') updateWebTabRules();
+});
 
 function isAllowedTabDuringShield(url) {
   if (!url) return false;
@@ -994,6 +1082,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ focusActive, shieldActive, timerState, blockedDomains, sessStart });
         break;
 
+      case 'GET_WEB_EMBED_BASE':
+        sendResponse({ url: chrome.runtime.getURL('web-embed.html') });
+        break;
+
       case 'SET_BLOCKED_DOMAINS':
         blockedDomains = msg.domains || [];
         saveState();
@@ -1072,6 +1164,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'WEB_TAB_ACTIVE':
         studyflowWebTabActive = !!msg.active;
+        if (msg.active) await findStudyflowTab();
+        await updateWebTabRules();
         sendResponse({ ok: true });
         break;
 

@@ -2149,8 +2149,45 @@
     }
 
     .web-blocked,
-    .web-youtube-blocked {
+    .web-youtube-blocked,
+    .web-load-fail {
       z-index: 5;
+    }
+
+    .web-load-fail {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      text-align: center;
+      background: #f8f9fa;
+    }
+
+    .web-load-fail.active {
+      display: flex;
+    }
+
+    .web-load-fail h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #202124;
+      margin: 0 0 8px;
+    }
+
+    .web-load-fail p {
+      font-size: 13px;
+      color: #5f6368;
+      max-width: 360px;
+      line-height: 1.5;
+      margin: 0 0 16px;
+    }
+
+    .web-load-fail-domain {
+      font-weight: 800;
+      color: var(--lime2);
     }
 
     .web-blocked {
@@ -4592,10 +4629,9 @@
               <div class="web-body">
                 <div class="web-loading" id="webLoading">Loading Google…</div>
                 <div class="web-embed-hint hidden" id="webEmbedHint">
-                  In-app sites need the <strong>StudyFlow Chrome extension</strong> (reload it at <code>chrome://extensions</code>) or the <strong>desktop app</strong>. Open StudyFlow from the extension icon, not a downloaded HTML file alone. You can still use <strong>↗ Open in new tab</strong>.
+                  Web tab needs the <strong>StudyFlow Chrome extension</strong>: reload it at <code>chrome://extensions</code>, then open StudyFlow from the extension icon. Or use the <strong>desktop .exe</strong>. You can still use <strong>↗ Open in new tab</strong>.
                 </div>
-                <iframe class="web-frame" id="webFrame" title="Web browser" referrerpolicy="no-referrer-when-downgrade"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-top-navigation allow-top-navigation-by-user-activation allow-presentation"></iframe>
+                <iframe class="web-frame" id="webFrame" title="Web browser" referrerpolicy="no-referrer-when-downgrade"></iframe>
                 <webview class="web-frame hidden" id="webView" partition="persist:studyflowweb" allowpopups
                   webpreferences="javascript=yes,webSecurity=no,allowRunningInsecureContent=yes"
                   preload="webview-guest-preload.js"
@@ -4613,6 +4649,13 @@
                   <div class="web-youtube-channel" id="webYoutubeBlockedChannel"></div>
                   <p id="webYoutubeBlockedMsg">Only verified educational YouTube channels are allowed.</p>
                   <button type="button" class="web-blocked-back" data-action="web-youtube-hub">Browse study channels</button>
+                  <button type="button" class="web-blocked-back" data-action="web-home" style="margin-top:8px;background:var(--s2);color:var(--dim)">Back to Google</button>
+                </div>
+                <div class="web-load-fail" id="webLoadFail">
+                  <div class="web-blocked-icon">🌐</div>
+                  <h2>Can't show this site here</h2>
+                  <p><span class="web-load-fail-domain" id="webLoadFailUrl">example.com</span> won't load inside StudyFlow (many sites block embedded browsers). Open it in Chrome or go back to Google.</p>
+                  <button type="button" class="web-blocked-back" data-action="web-open-external">Open in Chrome tab</button>
                   <button type="button" class="web-blocked-back" data-action="web-home" style="margin-top:8px;background:var(--s2);color:var(--dim)">Back to Google</button>
                 </div>
               </div>

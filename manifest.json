@@ -31,11 +31,6 @@
       ],
       "js": ["studyflow-page-bridge.js"],
       "run_at": "document_start"
-    },
-    {
-      "matches": ["chrome-extension://*/*studyflow.html*"],
-      "js": ["studyflow-page-bridge.js"],
-      "run_at": "document_start"
     }
   ],
   "action": {
@@ -47,7 +42,7 @@
     "open_in_tab": true
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https: http:;"
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https: http: chrome-extension:;"
   },
   "web_accessible_resources": [
     {

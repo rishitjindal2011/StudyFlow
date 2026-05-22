@@ -10,12 +10,10 @@
   </style>
 </head>
 <body>
-  <iframe id="site" title="Website"
-    referrerpolicy="no-referrer-when-downgrade"
-    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-top-navigation allow-top-navigation-by-user-activation allow-presentation"></iframe>
+  <iframe id="site" title="Website" referrerpolicy="no-referrer-when-downgrade"></iframe>
   <script>
     (function () {
-      function targetFromQuery() {
+      function readTarget() {
         const p = new URLSearchParams(location.search);
         let u = p.get('u') || p.get('url') || '';
         if (!u) return '';
@@ -23,8 +21,8 @@
         return /^https?:\/\//i.test(u) ? u : '';
       }
       const el = document.getElementById('site');
-      const start = targetFromQuery();
-      if (start) el.src = start;
+      const t = readTarget();
+      if (t) el.src = t;
       window.addEventListener('message', function (e) {
         if (!e.data || e.data.type !== 'SF_EMBED_NAV' || !e.data.url) return;
         if (/^https?:\/\//i.test(e.data.url)) el.src = e.data.url;

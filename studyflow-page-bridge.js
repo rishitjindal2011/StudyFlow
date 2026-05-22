@@ -23,8 +23,15 @@
 
   function notifyPage() {
     try {
-      window.postMessage({ type: 'SF_EXT_BRIDGE_READY' }, '*');
-    } catch (_) {}
+      chrome.runtime.sendMessage({ type: 'GET_WEB_EMBED_BASE' }, (res) => {
+        window.postMessage({
+          type: 'SF_EXT_BRIDGE_READY',
+          embedBase: (res && res.url) ? res.url : ''
+        }, '*');
+      });
+    } catch (_) {
+      try { window.postMessage({ type: 'SF_EXT_BRIDGE_READY', embedBase: '' }, '*'); } catch (__) {}
+    }
   }
 
   window.addEventListener('message', (e) => {
@@ -55,10 +62,18 @@
     });
   } catch (_) {}
 
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || !e.data || e.data.type !== 'SF_EXT_PROBE') return;
+    register();
+    pushBlocks();
+    notifyPage();
+  });
+
   register();
   pushBlocks();
   notifyPage();
   setInterval(pushBlocks, 4000);
+  setInterval(() => { register(); notifyPage(); }, 2500);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       register();
