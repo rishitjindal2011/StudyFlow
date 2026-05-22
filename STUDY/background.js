@@ -454,6 +454,12 @@ function isExtensionUrl(url, page) {
   return url.startsWith(chrome.runtime.getURL(page));
 }
 
+function isStudyflowPageUrl(url) {
+  if (!url) return false;
+  if (isExtensionUrl(url, STUDYFLOW_PAGE)) return true;
+  return /studyflow\.html/i.test(url);
+}
+
 function isAllowedTabDuringShield(url) {
   if (!url) return false;
   return isExtensionUrl(url, STUDYFLOW_PAGE) || isExtensionUrl(url, BLOCKED_PAGE);
@@ -463,7 +469,7 @@ async function findStudyflowTab() {
   if (studyflowTabId != null) {
     try {
       const t = await chrome.tabs.get(studyflowTabId);
-      if (t?.id && isExtensionUrl(t.url, STUDYFLOW_PAGE)) {
+      if (t?.id && isStudyflowPageUrl(t.url)) {
         if (t.windowId) studyflowWindowId = t.windowId;
         return t;
       }
@@ -471,11 +477,18 @@ async function findStudyflowTab() {
       studyflowTabId = null;
     }
   }
-  const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL(STUDYFLOW_PAGE) });
-  if (tabs[0]?.id) {
-    studyflowTabId = tabs[0].id;
-    if (tabs[0].windowId) studyflowWindowId = tabs[0].windowId;
-    return tabs[0];
+  const extTabs = await chrome.tabs.query({ url: chrome.runtime.getURL(STUDYFLOW_PAGE) });
+  if (extTabs[0]?.id) {
+    studyflowTabId = extTabs[0].id;
+    if (extTabs[0].windowId) studyflowWindowId = extTabs[0].windowId;
+    return extTabs[0];
+  }
+  const all = await chrome.tabs.query({});
+  const hosted = all.find((t) => isStudyflowPageUrl(t.url));
+  if (hosted?.id) {
+    studyflowTabId = hosted.id;
+    if (hosted.windowId) studyflowWindowId = hosted.windowId;
+    return hosted;
   }
   return null;
 }

@@ -25,10 +25,12 @@
     {
       "matches": [
         "*://*/studyflow.html*",
-        "*://*/*/studyflow.html*"
+        "*://*/*/studyflow.html*",
+        "file:///*/*studyflow.html*",
+        "file:///*/*/studyflow.html*"
       ],
       "js": ["studyflow-page-bridge.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "action": {

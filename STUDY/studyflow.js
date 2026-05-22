@@ -470,7 +470,20 @@
         } catch (_) { }
         return;
       }
-      if (!extAvailable()) return;
+      if (!extAvailable()) {
+        if (webExtBridgeReady) {
+          try {
+            await webExtSendMessage({ type: 'SET_BLOCKED_DOMAINS', domains: DB.blockedSites || [] });
+            await webExtSendMessage({
+              type: 'SYNC_EDU_YOUTUBE',
+              enabled: DB.eduYoutubeEnabled !== false,
+              extra: DB.eduYoutubeExtra || []
+            });
+            await webExtSendMessage({ type: 'REGISTER_STUDY_TAB' });
+          } catch (_) { }
+        }
+        return;
+      }
       try {
         await chrome.runtime.sendMessage({
           type: 'SET_BLOCKED_DOMAINS',
@@ -526,8 +539,8 @@
           resolve(sync);
           return;
         }
-        if (extAvailable()) {
-          chrome.runtime.sendMessage({ type: 'CHECK_YOUTUBE_URL', url }, (res) => {
+        if (webExtActive()) {
+          webExtSendMessage({ type: 'CHECK_YOUTUBE_URL', url }).then((res) => {
             resolve(res || { allowed: false, reason: 'Could not verify channel.' });
           });
           return;
@@ -611,8 +624,11 @@
     }
 
     function registerStudyTab() {
-      if (!extAvailable()) return;
-      chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB' }).catch(() => {});
+      if (extAvailable()) {
+        chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB' }).catch(() => {});
+        return;
+      }
+      if (webExtBridgeReady) webExtSendMessage({ type: 'REGISTER_STUDY_TAB' });
     }
 
     let pageFocusPollId = null;
@@ -2608,6 +2624,79 @@ PERSONALITY & RULES:
     // ─── WEB BROWSER (Google home + any site, blocklist enforced) ─────
     const GOOGLE_HOME = 'https://www.google.com/webhp?igu=1';
     let webInited = false;
+    let webExtBridgeReady = false;
+
+    function webExtActive() {
+      return extAvailable() || webExtBridgeReady;
+    }
+
+    function webExtSendMessage(msg) {
+      return new Promise((resolve) => {
+        if (extAvailable()) {
+          chrome.runtime.sendMessage(msg, (res) => {
+            void chrome.runtime.lastError;
+            resolve(res);
+          });
+          return;
+        }
+        if (!webExtBridgeReady) {
+          resolve(null);
+          return;
+        }
+        const reqId = 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const onReply = (e) => {
+          if (e.source !== window || !e.data || e.data.type !== 'SF_EXT_REPLY' || e.data.reqId !== reqId) return;
+          window.removeEventListener('message', onReply);
+          resolve(e.data.response);
+        };
+        window.addEventListener('message', onReply);
+        window.postMessage({ type: 'SF_EXT_SEND', reqId, msg }, '*');
+        setTimeout(() => {
+          window.removeEventListener('message', onReply);
+          resolve(null);
+        }, 12000);
+      });
+    }
+
+    function onWebExtensionBridgeReady() {
+      if (webExtBridgeReady) return;
+      webExtBridgeReady = true;
+      updateWebEmbedHint();
+      registerStudyTab();
+      pushBlockedDomainsToBackground();
+      if (!document.getElementById('view-web')?.classList.contains('active')) return;
+      if (webCurrentUrl) {
+        const bar = document.getElementById('webUrlInp')?.value;
+        webLoadUrl(webCurrentUrl, { push: false, displayInBar: bar != null ? bar : '', skipYoutubeCheck: false });
+      } else {
+        openGoogleHome();
+      }
+    }
+
+    function initWebExtensionBridgeListener() {
+      if (window.__sfWebBridgeListener) return;
+      window.__sfWebBridgeListener = true;
+      window.addEventListener('message', (e) => {
+        if (e.source !== window || !e.data) return;
+        if (e.data.type === 'SF_EXT_BRIDGE_READY') {
+          onWebExtensionBridgeReady();
+          return;
+        }
+        if (e.data.type !== 'SF_EXT_PUSH' || !e.data.msg) return;
+        const msg = e.data.msg;
+        if (msg.type === 'WEB_FRAME_NAV' && msg.url) {
+          handleWebFrameNav(msg.url);
+          return;
+        }
+        if (msg.type === 'WEB_YOUTUBE_BLOCKED') {
+          showYoutubeBlocked(msg.reason, msg.channelName, msg.redirect);
+          return;
+        }
+        if (msg.type === 'WEB_FRAME_BLOCKED' && msg.domain) {
+          handleWebFrameBlocked(msg.domain);
+        }
+      });
+    }
 
     function isWebViewEl(el) {
       return el && el.tagName && el.tagName.toLowerCase() === 'webview';
@@ -2701,7 +2790,7 @@ PERSONALITY & RULES:
     function updateWebEmbedHint() {
       const hint = document.getElementById('webEmbedHint');
       if (!hint) return;
-      const needsBridge = !desktopAvailable() && !extAvailable();
+      const needsBridge = !desktopAvailable() && !webExtActive();
       hint.classList.toggle('hidden', !needsBridge);
     }
 
@@ -3060,6 +3149,7 @@ PERSONALITY & RULES:
     function initWebBrowser() {
       if (webInited) return;
       webInited = true;
+      initWebExtensionBridgeListener();
       updateWebEmbedHint();
       const frame = document.getElementById('webFrame');
       const wv = document.getElementById('webView');
@@ -3161,8 +3251,8 @@ PERSONALITY & RULES:
     }
 
     function syncWebTabActiveFlag(active) {
-      if (!extAvailable()) return;
-      chrome.runtime.sendMessage({ type: 'WEB_TAB_ACTIVE', active: !!active }).catch(() => {});
+      if (!webExtActive()) return;
+      webExtSendMessage({ type: 'WEB_TAB_ACTIVE', active: !!active });
     }
 
     // ─── MODALS ───────────────────────────────────
