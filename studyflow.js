@@ -946,6 +946,7 @@
         }
       });
       registerStudyTab();
+      webEmbedRulesPrimed = true;
       syncShield();
       pushBlockedDomainsToBackground();
     }
@@ -2654,8 +2655,9 @@ PERSONALITY & RULES:
     function resetAll() { localStorage.removeItem('sf5'); location.reload(); }
 
     // ─── WEB BROWSER (Google home + any site, blocklist enforced) ─────
-    const GOOGLE_HOME = 'https://www.google.com/webhp?igu=1';
+    const GOOGLE_HOME = 'https://www.google.com/?igu=1';
     let webInited = false;
+    let webEmbedRulesPrimed = false;
     let webExtBridgeReady = false;
     let webviewNavFromApp = false;
     let pendingWebNavUrl = '';
@@ -2723,18 +2725,43 @@ PERSONALITY & RULES:
       else window.open(url, '_blank', 'noopener');
     }
 
+    function primeWebEmbedRules() {
+      if (webEmbedRulesPrimed) return;
+      const domains = DB.blockedSites || [];
+      if (extAvailable()) {
+        chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB', domains }, () => {
+          void chrome.runtime.lastError;
+          webEmbedRulesPrimed = true;
+        });
+        return;
+      }
+      if (webExtBridgeReady) {
+        webExtSendMessage({ type: 'REGISTER_STUDY_TAB', domains }).then(() => {
+          webEmbedRulesPrimed = true;
+        });
+      }
+    }
+
     function ensureWebEmbedRules() {
+      if (webEmbedRulesPrimed) {
+        registerStudyTab();
+        return Promise.resolve();
+      }
       const domains = DB.blockedSites || [];
       return new Promise((resolve) => {
         if (extAvailable()) {
           chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB', domains }, () => {
             void chrome.runtime.lastError;
-            setTimeout(resolve, 100);
+            webEmbedRulesPrimed = true;
+            resolve();
           });
           return;
         }
         if (webExtBridgeReady) {
-          webExtSendMessage({ type: 'REGISTER_STUDY_TAB', domains }).then(() => resolve());
+          webExtSendMessage({ type: 'REGISTER_STUDY_TAB', domains }).then(() => {
+            webEmbedRulesPrimed = true;
+            resolve();
+          });
           return;
         }
         resolve();
@@ -2777,19 +2804,33 @@ PERSONALITY & RULES:
       const wasReady = webExtBridgeReady;
       webExtBridgeReady = true;
       updateWebEmbedHint();
-      registerStudyTab();
+      primeWebEmbedRules();
       pushBlockedDomainsToBackground();
       const onWeb = document.getElementById('view-web')?.classList.contains('active');
       if (!onWeb) return;
-      const reload = webCurrentUrl || pendingWebNavUrl;
-      if (!wasReady && reload) {
+      if (!wasReady && !webCurrentUrl && !pendingWebNavUrl) {
+        openGoogleHome();
+        return;
+      }
+      if (!wasReady && (webCurrentUrl || pendingWebNavUrl)) {
+        const frame = getWebBrowserEl();
+        let hasContent = false;
+        if (frame && !isWebViewEl(frame)) {
+          try {
+            const href = frame.contentWindow?.location?.href || '';
+            hasContent = href && href !== 'about:blank';
+          } catch (_) {
+            hasContent = true;
+          }
+        } else if (frame && isWebViewEl(frame)) {
+          try { hasContent = !!(frame.getURL() && frame.getURL() !== 'about:blank'); } catch (_) {}
+        }
+        if (hasContent) return;
         const u = pendingWebNavUrl || webCurrentUrl;
         pendingWebNavUrl = '';
         const bar = document.getElementById('webUrlInp')?.value;
-        void webLoadUrl(u, { push: false, displayInBar: bar != null ? bar : u, skipYoutubeCheck: false });
-        return;
+        void webLoadUrl(u, { push: false, displayInBar: bar != null ? bar : u, skipYoutubeCheck: true });
       }
-      if (!wasReady && !webCurrentUrl) openGoogleHome();
     }
 
     function initWebExtensionBridgeListener() {
@@ -3029,9 +3070,8 @@ PERSONALITY & RULES:
 
     function openGoogleHome() {
       pendingWebNavUrl = '';
-      webLoadUrl(GOOGLE_HOME, { push: true, displayInBar: '' });
-      registerStudyTab();
-      pushBlockedDomainsToBackground();
+      primeWebEmbedRules();
+      void webLoadUrl(GOOGLE_HOME, { push: true, displayInBar: '', skipYoutubeCheck: true });
     }
 
     function webNavigateFromInput(raw) {
@@ -3110,28 +3150,26 @@ PERSONALITY & RULES:
       url = normalizeGoogleEmbedUrl(url);
       const push = !opts || opts.push !== false;
       const domain = hostnameFromUrl(url);
+      const isGoogleLoad = isGoogleUrl(url);
       if (isBlockedDomain(domain)) {
         webLastNavUrl = url;
         handleWebFrameBlocked(domain);
         return;
       }
-      if (!opts?.skipYoutubeCheck && isEduYoutubeEnabled()) {
-        const yt = await checkYoutubeForWeb(url);
-        if (!(await applyYoutubeGuardResult(yt, null))) return;
-      }
-      hideWebBlockedOverlay();
-      hideYoutubeBlocked();
-      hideWebLoadFail();
-      setWebLoading(true);
-      armWebLoadSafetyTimer();
       const frame = getWebBrowserEl();
       const targetUrl = webFrameTargetUrl(url);
-      if (!isWebViewEl(frame) && (extAvailable() || webExtBridgeReady)) await ensureWebEmbedRules();
-      if (isWebViewEl(frame)) await syncWebviewStudyData(frame);
+      const sameUrl = frame && !isWebViewEl(frame) && webNavUrlsEqual(webCurrentUrl, url);
+      if (!sameUrl) {
+        hideWebBlockedOverlay();
+        hideYoutubeBlocked();
+        hideWebLoadFail();
+        if (!isGoogleLoad) setWebLoading(true);
+        armWebLoadSafetyTimer();
+      }
       const urlInp = document.getElementById('webUrlInp');
       const barVal = opts && opts.displayInBar !== undefined ? opts.displayInBar : url;
       if (urlInp) urlInp.value = barVal;
-      if (frame) {
+      if (frame && !sameUrl) {
         frame.classList.remove('hidden');
         if (isWebViewEl(frame)) {
           webviewNavFromApp = true;
@@ -3145,6 +3183,15 @@ PERSONALITY & RULES:
           }
         }
       }
+      if (!isWebViewEl(frame) && (extAvailable() || webExtBridgeReady)) {
+        if (!webEmbedRulesPrimed) await ensureWebEmbedRules();
+        else void ensureWebEmbedRules();
+      }
+      if (!opts?.skipYoutubeCheck && !isGoogleLoad && isEduYoutubeEnabled()) {
+        const yt = await checkYoutubeForWeb(url);
+        if (!(await applyYoutubeGuardResult(yt, null))) return;
+      }
+      if (isWebViewEl(frame)) void syncWebviewStudyData(frame);
       if (isWebViewEl(frame) && isYoutubePageUrl(url)) {
         frame.addEventListener('dom-ready', function onYtReady() {
           injectWebviewYoutubeGuard(frame);
@@ -3343,6 +3390,7 @@ PERSONALITY & RULES:
       webInited = true;
       initWebExtensionBridgeListener();
       updateWebEmbedHint();
+      primeWebEmbedRules();
       const frame = document.getElementById('webFrame');
       const wv = document.getElementById('webView');
       ensureWebviewPreload(wv);
@@ -3450,18 +3498,15 @@ PERSONALITY & RULES:
         initWebBrowser();
         updateWebEmbedHint();
         updateWebShieldBadge();
-        registerStudyTab();
-        pushBlockedDomainsToBackground();
-        setTimeout(() => {
-          registerStudyTab();
-          pushBlockedDomainsToBackground();
-        }, 300);
+        primeWebEmbedRules();
         if (pendingWebNavUrl) {
           const u = pendingWebNavUrl;
           pendingWebNavUrl = '';
-          void webLoadUrl(u, { push: true, displayInBar: u });
-        } else {
+          void webLoadUrl(u, { push: true, displayInBar: u, skipYoutubeCheck: isGoogleUrl(u) });
+        } else if (!webCurrentUrl) {
           openGoogleHome();
+        } else {
+          registerStudyTab();
         }
       }
       syncWebTabActiveFlag(name === 'web');
@@ -3469,10 +3514,7 @@ PERSONALITY & RULES:
 
     function syncWebTabActiveFlag(active) {
       if (!webExtActive()) return;
-      if (active) {
-        registerStudyTab();
-        void ensureWebEmbedRules();
-      }
+      if (active) primeWebEmbedRules();
       webExtSendMessage({ type: 'WEB_TAB_ACTIVE', active: !!active });
     }
 

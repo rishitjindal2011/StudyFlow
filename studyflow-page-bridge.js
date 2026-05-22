@@ -72,13 +72,11 @@
   register();
   pushBlocks();
   notifyPage();
-  setInterval(pushBlocks, 4000);
-  setInterval(() => { register(); notifyPage(); }, 2500);
+  setInterval(pushBlocks, 15000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       register();
       pushBlocks();
-      notifyPage();
     }
   });
 })();

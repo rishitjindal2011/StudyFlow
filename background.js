@@ -65,7 +65,7 @@ async function loadState() {
     await startWindowGuard();
   }
 }
-loadState().then(() => updateWebTabRules());
+loadState().then(() => updateWebTabRules({ immediate: true }));
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (studyflowTabId != null && tabId === studyflowTabId) {
@@ -75,7 +75,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => updateWebTabRules());
+chrome.runtime.onInstalled.addListener(() => updateWebTabRules({ immediate: true }));
 
 const FRAME_HEADER_ACTION = {
   type: 'modifyHeaders',
@@ -210,7 +210,16 @@ async function getStudyflowTabForWebRules() {
   return findStudyflowTab();
 }
 
-async function updateWebTabRules() {
+let webTabRulesDebounce = null;
+let webTabRulesInFlight = null;
+let lastWebRulesKey = '';
+
+function webRulesFingerprint(tabId) {
+  const domains = (blockedDomains || []).map((d) => String(d || '').toLowerCase().replace(/^www\./, '')).filter(Boolean).sort();
+  return (tabId || 0) + '|' + domains.join(',');
+}
+
+async function updateWebTabRulesNow() {
   const removeIds = [FRAME_EMBED_RULE_ID, FRAME_EMBED_INIT_RULE_ID];
   for (let i = WEB_BLOCK_RULE_BASE; i <= WEB_BLOCK_RULE_MAX; i++) removeIds.push(i);
 
@@ -270,6 +279,34 @@ async function updateWebTabRules() {
   } catch (e) {
     console.warn('StudyFlow: web tab rules failed', e);
   }
+}
+
+function updateWebTabRules(opts) {
+  const immediate = !!(opts && opts.immediate);
+  if (webTabRulesDebounce) {
+    clearTimeout(webTabRulesDebounce);
+    webTabRulesDebounce = null;
+  }
+  const run = async () => {
+    const tab = await getStudyflowTabForWebRules();
+    const key = webRulesFingerprint(tab?.id);
+    if (!immediate && key === lastWebRulesKey) return;
+    lastWebRulesKey = key;
+    await updateWebTabRulesNow();
+  };
+  if (immediate) {
+    webTabRulesInFlight = run().finally(() => { webTabRulesInFlight = null; });
+    return webTabRulesInFlight;
+  }
+  return new Promise((resolve) => {
+    webTabRulesDebounce = setTimeout(() => {
+      webTabRulesDebounce = null;
+      webTabRulesInFlight = run().finally(() => {
+        webTabRulesInFlight = null;
+        resolve();
+      });
+    }, 50);
+  });
 }
 
 function isDomainOnBlocklist(url) {
@@ -594,9 +631,10 @@ function isStudyflowPageUrl(url) {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!tab?.url || !isStudyflowPageUrl(tab.url)) return;
+  const tabChanged = studyflowTabId !== tabId;
   studyflowTabId = tabId;
   if (tab.windowId) studyflowWindowId = tab.windowId;
-  if (changeInfo.status === 'complete') updateWebTabRules();
+  if (tabChanged) updateWebTabRules({ immediate: true });
 });
 
 function isAllowedTabDuringShield(url) {
@@ -1165,7 +1203,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'WEB_TAB_ACTIVE':
         studyflowWebTabActive = !!msg.active;
         if (msg.active) await findStudyflowTab();
-        await updateWebTabRules();
+        if (msg.active) await updateWebTabRules();
         sendResponse({ ok: true });
         break;
 
@@ -1176,11 +1214,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } else {
           await findStudyflowTab();
         }
-        if (Array.isArray(msg.domains)) {
+        const domainsChanged = Array.isArray(msg.domains);
+        if (domainsChanged) {
           blockedDomains = msg.domains;
           saveState();
         }
-        await updateWebTabRules();
+        await updateWebTabRules({ immediate: domainsChanged });
         sendResponse({ ok: true });
         break;
 
