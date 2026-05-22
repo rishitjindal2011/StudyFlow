@@ -162,7 +162,7 @@ async function updateWebTabRules() {
 
   if (tab?.id && blockedDomains.length) {
     blockedDomains.slice(0, WEB_BLOCK_RULE_MAX - WEB_BLOCK_RULE_BASE).forEach((domain, idx) => {
-      const clean = (domain || '').replace(/^www\./, '').trim();
+      const clean = (domain || '').replace(/^www\./, '').trim().toLowerCase();
       if (!clean) return;
       addRules.push({
         id: WEB_BLOCK_RULE_BASE + idx,
@@ -174,7 +174,8 @@ async function updateWebTabRules() {
           }
         },
         condition: {
-          urlFilter: '||' + clean,
+          urlFilter: '||' + clean + '^',
+          requestDomains: [clean],
           resourceTypes: ['sub_frame'],
           tabIds: [tab.id]
         }
@@ -203,7 +204,11 @@ function isDomainOnBlocklist(url) {
 }
 
 function notifyWebFrameBlocked(domain) {
-  chrome.runtime.sendMessage({ type: 'WEB_FRAME_BLOCKED', domain }).catch(() => {});
+  const msg = { type: 'WEB_FRAME_BLOCKED', domain };
+  chrome.runtime.sendMessage(msg).catch(() => {});
+  if (studyflowTabId != null) {
+    chrome.tabs.sendMessage(studyflowTabId, msg).catch(() => {});
+  }
 }
 
 let lastWebNavUrl = '';
@@ -397,6 +402,19 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
 chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   if (details.frameId === 0) return;
   await handleStudyflowSubframeNav(details);
+});
+
+chrome.webNavigation.onErrorOccurred.addListener(async (details) => {
+  if (details.frameId === 0) return;
+  if (!(await isStudyflowTabId(details.tabId))) return;
+  const url = details.url || '';
+  if (!url || !isDomainOnBlocklist(url)) return;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const blockedUrl = chrome.runtime.getURL(BLOCKED_PAGE) + '?domain=' + encodeURIComponent(host) + '&embed=1';
+    await redirectYoutubeSubframe(details.tabId, details.frameId, blockedUrl);
+    notifyWebFrameBlocked(host);
+  } catch (_) {}
 });
 
 // Google result links often use target="_blank" — load in Web iframe instead
@@ -1031,6 +1049,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (sender.tab?.id) {
           studyflowTabId = sender.tab.id;
           if (sender.tab.windowId) studyflowWindowId = sender.tab.windowId;
+        } else {
+          await findStudyflowTab();
+        }
+        if (Array.isArray(msg.domains)) {
+          blockedDomains = msg.domains;
+          saveState();
         }
         await updateWebTabRules();
         sendResponse({ ok: true });

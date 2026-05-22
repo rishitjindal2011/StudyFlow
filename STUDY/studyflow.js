@@ -624,11 +624,12 @@
     }
 
     function registerStudyTab() {
+      const payload = { type: 'REGISTER_STUDY_TAB', domains: DB.blockedSites || [] };
       if (extAvailable()) {
-        chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB' }).catch(() => {});
+        chrome.runtime.sendMessage(payload).catch(() => {});
         return;
       }
-      if (webExtBridgeReady) webExtSendMessage({ type: 'REGISTER_STUDY_TAB' });
+      if (webExtBridgeReady) webExtSendMessage(payload);
     }
 
     let pageFocusPollId = null;
@@ -874,6 +875,7 @@
       if (!viewWeb?.classList.contains('active')) return;
       const domain = hostnameFromUrl(resolved);
       if (isBlockedDomain(domain)) {
+        webLastNavUrl = resolved;
         handleWebFrameBlocked(domain);
         return;
       }
@@ -2722,6 +2724,25 @@ PERSONALITY & RULES:
     let webHistory = [];
     let webHistIdx = -1;
     let webCurrentUrl = '';
+    let webLastNavUrl = '';
+
+    function webBlockedPageUrl(domain) {
+      const q = '?domain=' + encodeURIComponent(domain || 'blocked site') + '&embed=1';
+      if (extAvailable()) return chrome.runtime.getURL('blocked.html') + q;
+      try { return new URL('blocked.html' + q, window.location.href).href; } catch (_) { return ''; }
+    }
+
+    function webLoadBlockedPage(domain) {
+      const url = webBlockedPageUrl(domain);
+      hideWebBlockedOverlay();
+      hideYoutubeBlocked();
+      if (!url) {
+        showWebBlockedOverlay(domain);
+        return;
+      }
+      webLastNavUrl = url;
+      webLoadUrl(url, { push: false, displayInBar: domain, skipYoutubeCheck: true });
+    }
 
     function isGoogleUrl(url) {
       try {
@@ -2840,11 +2861,7 @@ PERSONALITY & RULES:
 
     function handleWebFrameBlocked(domain) {
       if (!domain) return;
-      const frame = getWebBrowserEl();
-      if (frame && !isWebViewEl(frame)) {
-        try { frame.src = 'about:blank'; } catch (_) {}
-      }
-      showWebBlockedOverlay(domain);
+      webLoadBlockedPage(domain);
       if (isRun && !isBreak && !enforcementPaused) {
         if (domain !== lastCaughtDomain) {
           lastCaughtDomain = domain;
@@ -2939,6 +2956,7 @@ PERSONALITY & RULES:
       const push = !opts || opts.push !== false;
       const domain = hostnameFromUrl(url);
       if (isBlockedDomain(domain)) {
+        webLastNavUrl = url;
         handleWebFrameBlocked(domain);
         return;
       }
@@ -2975,6 +2993,7 @@ PERSONALITY & RULES:
         }, { once: true });
       }
       webCurrentUrl = url;
+      webLastNavUrl = url;
       updateWebUrlFieldForContext(url);
       if (push) {
         if (webHistIdx < webHistory.length - 1) webHistory = webHistory.slice(0, webHistIdx + 1);
@@ -3073,6 +3092,11 @@ PERSONALITY & RULES:
         try { href = frame.getURL() || ''; } catch (_) { href = ''; }
       } else {
         try { href = frame.contentWindow.location.href; } catch (_) {
+          const pending = webLastNavUrl || webCurrentUrl;
+          const pendingDomain = hostnameFromUrl(pending);
+          if (pendingDomain && isBlockedDomain(pendingDomain)) {
+            handleWebFrameBlocked(pendingDomain);
+          }
           updateWebNavButtons();
           return;
         }
@@ -3080,12 +3104,10 @@ PERSONALITY & RULES:
       if (!href || href === 'about:blank') return;
 
       if (href.includes('blocked.html')) {
-        try {
-          const domain = new URL(href).searchParams.get('domain') || 'blocked site';
-          handleWebFrameBlocked(domain);
-        } catch (_) {
-          handleWebFrameBlocked('blocked site');
-        }
+        hideWebBlockedOverlay();
+        hideYoutubeBlocked();
+        webCurrentUrl = href;
+        updateWebNavButtons();
         return;
       }
 

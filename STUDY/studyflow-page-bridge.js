@@ -2,7 +2,12 @@
 (function () {
   function register() {
     try {
-      chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB' }, () => void chrome.runtime.lastError);
+      let domains = [];
+      try {
+        const raw = localStorage.getItem('sf5');
+        if (raw) domains = JSON.parse(raw).blockedSites || [];
+      } catch (_) {}
+      chrome.runtime.sendMessage({ type: 'REGISTER_STUDY_TAB', domains }, () => void chrome.runtime.lastError);
     } catch (_) {}
   }
 
