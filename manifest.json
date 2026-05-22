@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "StudyFlow",
+  "version": "1.0.0",
+  "description": "Focus enforced. Progress tracked. No excuses.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "notifications",
+    "webNavigation",
+    "scripting",
+    "offscreen",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*/studyflow.html*",
+        "*://*/*/studyflow.html*",
+        "file:///*/*studyflow.html*",
+        "file:///*/*/studyflow.html*"
+      ],
+      "js": ["studyflow-page-bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "StudyFlow"
+  },
+  "options_ui": {
+    "page": "studyflow.html",
+    "open_in_tab": true
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https: http:;"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "blocked.html",
+        "youtube-study.html",
+        "youtube-study.js",
+        "youtube-study.css",
+        "edu-youtube.js",
+        "studyflow-logo.svg",
+        "native-lock/Repair-StudyFlow-Lock.bat",
+        "native-lock/Repair-StudyFlow-Lock.ps1",
+        "native-lock/StudyFlowLockHost.exe",
+        "native-lock/StudyFlow-Lock-Setup.bat",
+        "native-lock/Run-Setup.ps1",
+        "native-lock/Compile-StudyFlowLock.ps1",
+        "native-lock/StudyFlowLockHost.cs",
+        "native-lock/unlock-now.bat",
+        "StudyFlow-Lock-Setup.exe",
+        "StudyFlowLockHost.exe"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

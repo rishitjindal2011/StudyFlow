@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="StudyFlow">
+  <defs>
+    <linearGradient id="sf-ring" x1="10" y1="8" x2="38" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7dffb0"/>
+      <stop offset=".45" stop-color="#63ff88"/>
+      <stop offset="1" stop-color="#2ecfff"/>
+    </linearGradient>
+    <linearGradient id="sf-wave" x1="14" y1="30" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#63ff88"/>
+      <stop offset="1" stop-color="#45e6ff"/>
+    </linearGradient>
+    <radialGradient id="sf-aura" cx="24" cy="20" r="18" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#63ff88" stop-opacity=".28"/>
+      <stop offset="1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sf-panel" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#161b24"/>
+      <stop offset="1" stop-color="#0a0d12"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App icon base -->
+  <rect width="48" height="48" rx="13" fill="url(#sf-panel)"/>
+  <rect width="48" height="48" rx="13" fill="url(#sf-aura)"/>
+  <rect x=".75" y=".75" width="46.5" height="46.5" rx="12.25" stroke="url(#sf-ring)" stroke-opacity=".22"/>
+
+  <!-- Focus timer arc (~300°) -->
+  <path
+    d="M24 12.5a11.5 11.5 0 1 1-9.2 17.2"
+    stroke="url(#sf-ring)"
+    stroke-width="3"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Session tick at top -->
+  <circle cx="24" cy="12.5" r="2" fill="#7dffb0"/>
+
+  <!-- Flow waves — momentum / study rhythm -->
+  <path
+    d="M13.5 31.2c3.2-5.2 6.8-7.7 10.5-7.7s7.3 2.5 10.5 7.7"
+    stroke="url(#sf-wave)"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    fill="none"
+    opacity=".35"
+  />
+  <path
+    d="M12 33.8c4-6.5 8.2-9.8 12-9.8s8 3.3 12 9.8"
+    stroke="url(#sf-wave)"
+    stroke-width="2.8"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Center focus node -->
+  <circle cx="24" cy="22.5" r="4.25" fill="#0a0d12" stroke="url(#sf-ring)" stroke-width="1.75"/>
+  <circle cx="24" cy="22.5" r="1.6" fill="url(#sf-ring)"/>
+</svg>

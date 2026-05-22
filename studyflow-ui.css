@@ -1,0 +1,528 @@
+/* StudyFlow UI polish — enhances midnight theme, all features unchanged */
+
+:root {
+  --sf-glow: rgba(99, 255, 136, 0.35);
+  --sf-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --sf-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --sf-glass: rgba(15, 15, 22, 0.72);
+}
+
+/* Ambient background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(99, 255, 136, 0.07), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(168, 85, 247, 0.06), transparent 45%),
+    radial-gradient(ellipse 50% 30% at 50% 50%, rgba(24, 220, 255, 0.03), transparent 60%);
+}
+
+.orb {
+  opacity: 0.85;
+}
+
+/* ── Setup screen ── */
+#s-setup.active {
+  background: var(--bg);
+}
+
+#s-setup .setup-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+#s-setup .hero-title {
+  font-size: clamp(32px, 8vw, 42px);
+  letter-spacing: -0.03em;
+}
+
+#s-setup .scard {
+  box-shadow: var(--sf-shadow-sm);
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+#s-setup .scard:hover {
+  border-color: rgba(99, 255, 136, 0.2);
+  box-shadow: var(--sf-shadow);
+}
+
+#s-setup .go-btn {
+  box-shadow: 0 4px 24px rgba(99, 255, 136, 0.25);
+}
+
+/* ── App shell ── */
+#s-app {
+  position: relative;
+  z-index: 1;
+}
+
+#s-app .topbar {
+  padding: 12px 24px;
+  background: var(--sf-glass);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#s-app .av {
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 0 20px var(--sf-glow);
+}
+
+#s-app .tn {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+#s-app #tbStatWrap .focus-pill {
+  background: rgba(99, 255, 136, 0.1);
+  border: 1px solid rgba(99, 255, 136, 0.28);
+  color: var(--lime);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 10px;
+}
+
+#s-app #tbStatWrap .focus-pill .dot {
+  background: var(--lime);
+  animation: sfPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sfPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+#s-app .ib {
+  border-radius: 11px;
+  transition: transform 0.15s, border-color 0.2s, background 0.2s;
+}
+
+#s-app .ib:hover {
+  transform: translateY(-1px);
+  background: var(--s3);
+}
+
+#s-app .ib.theme-ib {
+  background: rgba(99, 255, 136, 0.08);
+  border-color: rgba(99, 255, 136, 0.2);
+}
+
+/* Sidebar */
+@media (min-width: 768px) {
+  #s-app .sidebar {
+    width: 228px;
+    padding: 20px 12px;
+    background: linear-gradient(180deg, var(--s1) 0%, rgba(15, 15, 22, 0.98) 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+}
+
+#s-app .sf-brand {
+  margin-bottom: 8px;
+}
+
+#s-app .sf-logo-side {
+  box-shadow: 0 4px 20px var(--sf-glow);
+}
+
+#s-app .sf-logo-bar {
+  box-shadow: 0 2px 14px var(--sf-glow);
+}
+
+#s-setup .sf-logo-hero {
+  animation: sfLogoIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sfLogoIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+#s-app .sb-btn {
+  border-radius: 12px;
+  margin-bottom: 2px;
+}
+
+#s-app .sb-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateX(2px);
+}
+
+#s-app .sb-btn.active {
+  background: linear-gradient(135deg, rgba(99, 255, 136, 0.18), rgba(99, 255, 136, 0.06));
+  border: 1px solid rgba(99, 255, 136, 0.25);
+  color: var(--text);
+  box-shadow: 0 0 20px rgba(99, 255, 136, 0.08);
+}
+
+#s-app .sb-btn.active svg {
+  stroke: var(--lime);
+  filter: drop-shadow(0 0 6px var(--sf-glow));
+}
+
+#s-app .sb-theme-btn {
+  border-radius: 12px;
+  background: var(--s2);
+}
+
+#s-app .sb-theme-btn:hover {
+  background: var(--s3);
+  border-color: var(--bhi);
+}
+
+/* Content area */
+#s-app .content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 255, 136, 0.25) transparent;
+}
+
+#s-app .content::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+#s-app .content::-webkit-scrollbar-thumb {
+  background: rgba(99, 255, 136, 0.2);
+  border-radius: 3px;
+}
+
+#s-app .content-inner {
+  max-width: 1100px;
+  padding: 24px 28px 72px;
+}
+
+@media (min-width: 1080px) {
+  #s-app .content-inner {
+    padding: 28px 36px 48px;
+  }
+
+  #s-app .timer-cols {
+    gap: 24px;
+  }
+}
+
+/* Cards */
+#s-app .card,
+#s-app .ccrd,
+#s-app .scard {
+  box-shadow: var(--sf-shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+#s-app .card:hover,
+#s-app .ccrd:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: var(--sf-shadow);
+}
+
+#s-app .card .cline {
+  background: linear-gradient(90deg, transparent, var(--lime), transparent);
+  opacity: 0.5;
+  height: 2px;
+}
+
+/* Timer */
+#s-app .chip {
+  background: var(--s2);
+  padding: 6px 14px;
+}
+
+#s-app .chip.active {
+  box-shadow: 0 2px 12px rgba(99, 255, 136, 0.3);
+}
+
+#s-app .ring-wrap {
+  filter: drop-shadow(0 0 28px rgba(99, 255, 136, 0.12));
+}
+
+#s-app .ring-wrap.running {
+  filter: drop-shadow(0 0 36px rgba(99, 255, 136, 0.28));
+  animation: sfRingPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes sfRingPulse {
+  0%, 100% { filter: drop-shadow(0 0 28px rgba(99, 255, 136, 0.15)); }
+  50% { filter: drop-shadow(0 0 44px rgba(99, 255, 136, 0.35)); }
+}
+
+#s-app .rtime {
+  font-weight: 500;
+  text-shadow: 0 0 40px rgba(99, 255, 136, 0.15);
+}
+
+#s-app .bplay {
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(99, 255, 136, 0.25);
+  letter-spacing: 0.02em;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+#s-app .bplay:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(99, 255, 136, 0.35);
+}
+
+#s-app .bplay:active {
+  transform: scale(0.98);
+}
+
+#s-app .sqc,
+#s-app .sqb {
+  transition: transform 0.15s, border-color 0.2s, background 0.2s;
+}
+
+#s-app .sqc:hover,
+#s-app .sqb:hover {
+  background: var(--s3);
+  border-color: var(--bhi);
+  transform: scale(1.03);
+}
+
+#s-app .sel {
+  background: var(--s2);
+  border-radius: 12px;
+}
+
+#s-app .sel:focus {
+  box-shadow: 0 0 0 3px rgba(99, 255, 136, 0.12);
+}
+
+/* Stats strip */
+#s-app .strip {
+  gap: 12px;
+}
+
+#s-app .stile {
+  border-radius: 16px;
+  padding: 18px 12px;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+#s-app .stile:hover {
+  transform: translateY(-3px);
+  border-color: rgba(99, 255, 136, 0.2);
+  box-shadow: var(--sf-shadow-sm);
+}
+
+#s-app .snum {
+  font-size: 28px;
+  font-weight: 500;
+}
+
+/* Subject grid */
+#s-app .stile2 {
+  border-radius: 16px;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+#s-app .stile2:hover {
+  border-color: rgba(99, 255, 136, 0.25);
+  box-shadow: var(--sf-shadow-sm);
+  transform: translateY(-3px);
+}
+
+#s-app .sbar {
+  height: 3px;
+  opacity: 0.65;
+  border-radius: 0 0 16px 16px;
+}
+
+#s-app .sh .st {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+
+/* Parental row */
+#s-app .parental-row {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+#s-app .parental-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.2);
+}
+
+/* Web browser */
+#s-app .web-wrap {
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--bd);
+  box-shadow: var(--sf-shadow-sm);
+}
+
+#s-app .web-toolbar {
+  background: var(--s2);
+  border-bottom: 1px solid var(--bd);
+}
+
+#s-app .web-go-btn {
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+#s-app .web-shield-badge.on {
+  box-shadow: 0 0 12px rgba(99, 255, 136, 0.2);
+}
+
+/* Chat */
+#s-app .chat-wrap {
+  border-radius: 18px;
+  border: 1px solid var(--bd);
+  box-shadow: var(--sf-shadow-sm);
+  overflow: hidden;
+}
+
+#s-app .chat-hdr {
+  background: var(--s2);
+  border-bottom: 1px solid var(--bd);
+}
+
+#s-app .send-btn {
+  box-shadow: 0 2px 12px rgba(99, 255, 136, 0.2);
+}
+
+#s-app .qchip {
+  transition: transform 0.15s, border-color 0.2s, background 0.2s;
+}
+
+#s-app .qchip:hover {
+  transform: translateY(-1px);
+  border-color: var(--bhi);
+}
+
+/* Block list */
+#s-app .mitem,
+#s-app .icard {
+  border-radius: 14px;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+#s-app .mitem:hover,
+#s-app .icard:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(3px);
+}
+
+/* Stats charts */
+#s-app .bf {
+  border-radius: 6px 6px 0 0;
+}
+
+#s-app .bf.today {
+  box-shadow: 0 0 12px var(--sf-glow);
+}
+
+/* Streak calendar */
+#s-app .wc {
+  border-radius: 12px;
+  transition: transform 0.15s, border-color 0.2s;
+}
+
+#s-app .wc:hover {
+  transform: scale(1.05);
+}
+
+/* Mobile nav */
+#s-app .mobile-nav {
+  background: var(--sf-glass);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+}
+
+#s-app .mnb {
+  border-radius: 14px;
+  padding: 8px 4px;
+}
+
+#s-app .mnb.active {
+  background: rgba(99, 255, 136, 0.1);
+  color: var(--lime);
+}
+
+/* Modals */
+#MODAL {
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+#MODAL_BOX {
+  border-radius: 22px !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Toast */
+.toast {
+  border-radius: 14px;
+  border: 1px solid rgba(99, 255, 136, 0.25);
+  box-shadow: var(--sf-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.toast.show {
+  animation: sfToastIn 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes sfToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Focus lock overlay */
+#focus-lock.active {
+  backdrop-filter: blur(8px);
+}
+
+/* Inputs global polish */
+#s-app input.inp,
+#s-app .inp,
+#s-app .sel,
+#s-app .web-url-inp,
+#s-app .si-inp,
+#s-app .sub-inp {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#s-app input:focus,
+#s-app .inp:focus,
+#s-app .sel:focus,
+#s-app .web-url-inp:focus {
+  box-shadow: 0 0 0 3px rgba(99, 255, 136, 0.1);
+}
+
+/* View transitions */
+#s-app .view.active {
+  animation: sfFadeUp 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sfFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Pomodoro dots */
+#s-app .pd.lit {
+  transform: scale(1.15);
+}

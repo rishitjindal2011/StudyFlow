@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="StudyFlow — focus timer, site blocking, and Alt+Tab lock for students. Download the Windows app or use in your browser.">
+  <meta name="theme-color" content="#09090e">
+  <title>StudyFlow — Focus & Study</title>
+  <link rel="icon" href="studyflow-logo.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090e;
+      --s1: #0f0f16;
+      --s2: #15151e;
+      --text: #f2f2fa;
+      --dim: rgba(242, 242, 250, 0.55);
+      --mut: rgba(242, 242, 250, 0.32);
+      --lime: #63ff88;
+      --lime2: #22c55e;
+      --sky: #18dcff;
+      --bd: rgba(255, 255, 255, 0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .glow {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 50% at 50% -10%, rgba(99, 255, 136, 0.12), transparent),
+        radial-gradient(ellipse 40% 30% at 90% 80%, rgba(24, 220, 255, 0.06), transparent);
+    }
+    .wrap {
+      position: relative;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 24px 64px;
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 56px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+      font-weight: 700;
+      font-size: 1.15rem;
+    }
+    .brand img { width: 40px; height: 40px; }
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 10px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--s2); }
+    .hero {
+      text-align: center;
+      padding: 12px 0 48px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--lime);
+      background: rgba(99, 255, 136, 0.1);
+      border: 1px solid rgba(99, 255, 136, 0.25);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 6vw, 3.4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 18px;
+    }
+    h1 span {
+      background: linear-gradient(135deg, var(--lime), var(--sky));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero p {
+      max-width: 560px;
+      margin: 0 auto 32px;
+      color: var(--dim);
+      font-size: 1.1rem;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--lime2), var(--lime));
+      color: #041208;
+      box-shadow: 0 8px 32px rgba(99, 255, 136, 0.25);
+    }
+    .btn-primary:hover { box-shadow: 0 12px 40px rgba(99, 255, 136, 0.35); }
+    .btn-secondary {
+      background: var(--s2);
+      color: var(--text);
+      border: 1px solid var(--bd);
+    }
+    .btn-secondary:hover { border-color: rgba(99, 255, 136, 0.35); }
+    .dl-meta {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: var(--mut);
+    }
+    .dl-meta code {
+      font-size: 0.8rem;
+      background: var(--s1);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .install-steps {
+      margin-top: 48px;
+      background: var(--s1);
+      border: 1px solid var(--bd);
+      border-radius: 20px;
+      padding: 28px 32px;
+      text-align: left;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .install-steps h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--lime);
+    }
+    .install-steps ol {
+      padding-left: 1.25rem;
+      color: var(--dim);
+      font-size: 0.95rem;
+    }
+    .install-steps li { margin-bottom: 10px; }
+    .install-steps strong { color: var(--text); font-weight: 600; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 56px;
+    }
+    .card {
+      background: var(--s1);
+      border: 1px solid var(--bd);
+      border-radius: 16px;
+      padding: 22px;
+    }
+    .card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .card p {
+      font-size: 0.9rem;
+      color: var(--dim);
+    }
+    footer {
+      margin-top: 64px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--mut);
+    }
+    footer a { color: var(--dim); }
+    .dl-status {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      min-height: 1.2em;
+    }
+    .dl-status.ok { color: var(--lime); }
+    .dl-status.warn { color: #ffa502; }
+    @media (max-width: 600px) {
+      .install-steps { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="./">
+        <img src="studyflow-logo.svg" alt="" width="40" height="40">
+        StudyFlow
+      </a>
+      <div class="nav-links">
+        <a href="studyflow.html">Open in browser</a>
+        <a href="#download">Download</a>
+        <a href="https://github.com/rishitjindal2011/StudyFlow" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <header class="hero" id="download">
+      <span class="badge">Windows app · No Chrome required</span>
+      <h1>Stay in focus.<br><span>Block distractions.</span></h1>
+      <p>
+        Pomodoro timer, block lists, parental controls, and Alt+Tab lock during focus —
+        packaged as a real desktop app for students.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" id="btnDownload" href="https://github.com/rishitjindal2011/StudyFlow/releases" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn-secondary" href="studyflow.html">Use in browser</a>
+      </div>
+      <p class="dl-meta">
+        Installer <code id="installerName">StudyFlow-Setup-1.0.0.exe</code> · Windows 10/11 ·
+        <span id="versionLabel">v1.0.0</span>
+      </p>
+      <p class="dl-status" id="dlStatus" aria-live="polite"></p>
+
+      <div class="install-steps">
+        <h2>How to install (like any professional app)</h2>
+        <ol>
+          <li>Click <strong>Download for Windows</strong> — saves the installer (<code>StudyFlow-Setup</code>).</li>
+          <li>Run the installer → choose folder → <strong>Install</strong>.</li>
+          <li>Open <strong>StudyFlow</strong> from the desktop or Start menu.</li>
+          <li>Start a focus session — Alt+Tab is blocked automatically. No Chrome extension needed.</li>
+        </ol>
+      </div>
+    </header>
+
+    <section class="grid" aria-label="Features">
+      <article class="card">
+        <h3>Desktop app</h3>
+        <p>Runs in its own window — not a browser tab. Fullscreen focus mode and PC-level Alt+Tab block.</p>
+      </article>
+      <article class="card">
+        <h3>Timer & stats</h3>
+        <p>Pomodoro, custom modes, streaks, subjects, themes, and Flux AI study help.</p>
+      </article>
+      <article class="card">
+        <h3>Parental mode</h3>
+        <p>Password-protected settings so students cannot disable blocks mid-session.</p>
+      </article>
+      <article class="card">
+        <h3>Also on the web</h3>
+        <p>Use <a href="studyflow.html" style="color:var(--lime)">studyflow.html</a> in Chrome with the extension for blocking other tabs.</p>
+      </article>
+    </section>
+
+    <footer>
+      <p>
+        <a href="#" id="linkPortable">Portable .exe (no install)</a> ·
+        <a href="#" id="linkReleases">All releases</a> ·
+        <a href="studyflow.html">Web app</a>
+      </p>
+      <p style="margin-top:8px">© StudyFlow · <a href="https://github.com/rishitjindal2011/StudyFlow">Source on GitHub</a></p>
+    </footer>
+  </div>
+  <script src="site-config.js"></script>
+  <script>
+    (function () {
+      var cfg = window.STUDYFLOW_SITE;
+      if (!cfg) return;
+
+      var btn = document.getElementById('btnDownload');
+      var status = document.getElementById('dlStatus');
+      var nameEl = document.getElementById('installerName');
+      var verEl = document.getElementById('versionLabel');
+
+      nameEl.textContent = cfg.installerFile;
+      verEl.textContent = 'v' + cfg.version;
+      document.getElementById('linkReleases').href = cfg.releasesPage;
+
+      function setNotReady(msg) {
+        btn.href = cfg.releasesPage;
+        btn.removeAttribute('download');
+        btn.onclick = function (e) {
+          e.preventDefault();
+          window.open(cfg.releasesPage, '_blank', 'noopener');
+        };
+        status.textContent = msg;
+        status.className = 'dl-status warn';
+      }
+
+      cfg.resolveInstallerDownload().then(function (dl) {
+        if (dl.local) {
+          btn.href = dl.url;
+          btn.setAttribute('download', cfg.installerFile);
+          btn.onclick = null;
+          status.textContent = 'Local test — downloads from desktop/dist/ on this PC.';
+          status.className = 'dl-status ok';
+          document.getElementById('linkPortable').href = cfg.portableUrl;
+          return;
+        }
+
+        if (dl.ready) {
+          btn.href = dl.url;
+          btn.setAttribute('download', cfg.installerFile);
+          btn.onclick = null;
+          status.textContent = 'Installer ready' + (dl.published ? ' — ' + String(dl.published).slice(0, 10) : '') + '.';
+          status.className = 'dl-status ok';
+          fetch('https://api.github.com/repos/' + cfg.repo + '/releases/latest')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (rel) {
+              if (!rel) return;
+              var portable = (rel.assets || []).find(function (a) { return a.name === cfg.portableFile; });
+              document.getElementById('linkPortable').href = portable
+                ? portable.browser_download_url
+                : cfg.releasesPage;
+            })
+            .catch(function () {
+              document.getElementById('linkPortable').href = cfg.releasesPage;
+            });
+          return;
+        }
+
+        if (dl.reason === 'no_release') {
+          setNotReady('Installer not published yet — opens GitHub Releases (upload StudyFlow-Setup-1.0.0.exe).');
+        } else if (dl.reason === 'missing_asset') {
+          setNotReady('Release exists but the installer file is missing — upload ' + cfg.installerFile + ' on Releases.');
+        } else {
+          setNotReady('Could not reach GitHub — try again or open Releases.');
+        }
+        document.getElementById('linkPortable').href = cfg.releasesPage;
+      });
+    })();
+  </script>
+</body>
+</html>

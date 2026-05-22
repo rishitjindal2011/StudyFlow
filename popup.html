@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>StudyFlow</title>
+  <link rel="icon" href="studyflow-logo.svg" type="image/svg+xml">
+  <style>
+    body {
+      width: 280px;
+      margin: 0;
+      padding: 20px;
+      background: #111;
+      color: white;
+      font-family: system-ui, sans-serif;
+    }
+
+    .popup-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .popup-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      box-shadow:
+        0 6px 20px rgba(99, 255, 136, 0.3),
+        0 0 16px rgba(46, 207, 255, 0.1);
+    }
+
+    h1 {
+      color: #f2f2fa;
+      font-size: 18px;
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    h1 span {
+      color: #63ff88;
+    }
+
+    p {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-bottom: 12px;
+    }
+
+    #status {
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #1a1a24;
+      margin-bottom: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #63ff88;
+      color: #000;
+      font-weight: 800;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+
+    button.secondary {
+      background: #2a2a38;
+      color: #ccc;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="popup-brand">
+    <img src="studyflow-logo.svg" alt="" class="popup-logo" width="44" height="44">
+    <h1>Study<span>Flow</span></h1>
+  </div>
+  <p>Block distractions during focus sessions.</p>
+  <div id="status">Loading…</div>
+  <button id="openApp">Open StudyFlow</button>
+  <button class="secondary" id="openBlock">Manage blocked sites</button>
+  <script src="popup.js"></script>
+</body>
+
+</html>
