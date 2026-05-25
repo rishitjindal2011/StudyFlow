@@ -1,6 +1,6 @@
 {
   "name": "com.studyflow.lock",
-  "description": "StudyFlow PC lock — blocks Alt+Tab and similar shortcuts during focus",
+  "description": "StudyFlow PC lock — blocks Alt+Tab, Alt+F4, shutdown shortcuts during focus",
   "path": "HOST_BAT_PATH",
   "type": "stdio",
   "allowed_origins": [

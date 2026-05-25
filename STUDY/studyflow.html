@@ -4715,7 +4715,7 @@
                   PC lock (Windows)
                 </div>
               </div>
-              <p class="pc-lock-desc">Blocks <strong>Alt+Tab</strong> during focus on Windows. Click install — your extension ID is filled in automatically.</p>
+              <p class="pc-lock-desc">During focus on Windows, blocks <strong>Alt+Tab</strong>, <strong>Alt+F4</strong>, and <strong>shutdown</strong>. Chrome users: install PC Lock below (extension ID is filled in automatically). The <strong>StudyFlow App</strong> includes this built in.</p>
 
               <div class="pc-lock-status missing" id="pcLockStatus">Checking…</div>
 
@@ -4727,10 +4727,10 @@
                   <strong>Almost done:</strong> In <strong>Downloads</strong>, double-click <code>StudyFlow-Lock-Setup.exe</code>. Then reload StudyFlow and click Check connection.
                 </p>
                 <button type="button" class="pc-lock-btn" data-action="pc-lock-retry">Check connection</button>
-                <button type="button" class="pc-lock-btn primary" data-action="pc-lock-repair">Fix Alt+Tab (repair kit)</button>
-                <button type="button" class="pc-lock-btn" data-action="pc-lock-emergency-unlock">Fix stuck Alt+Tab NOW</button>
+                <button type="button" class="pc-lock-btn primary" data-action="pc-lock-repair">Fix PC lock (repair kit)</button>
+                <button type="button" class="pc-lock-btn" data-action="pc-lock-emergency-unlock">Fix stuck shortcuts NOW</button>
               </div>
-              <p class="pc-lock-note" style="margin-top:10px"><strong>Alt+Tab still works?</strong> Click <strong>Fix Alt+Tab (repair kit)</strong>, run <code>Repair-StudyFlow-Lock.bat</code> from Downloads, reload the extension, then start focus.<br><strong>Stuck?</strong> Use <strong>Fix stuck Alt+Tab NOW</strong> or <code>Unlock-AltTab-NOW.bat</code>.</p>
+              <p class="pc-lock-note" style="margin-top:10px"><strong>Alt+Tab, Alt+F4, or shutdown still work?</strong> Click <strong>Fix PC lock (repair kit)</strong>, run <code>Repair-StudyFlow-Lock.bat</code> from Downloads, reload the extension, then start focus.<br><strong>Stuck?</strong> Use <strong>Fix stuck shortcuts NOW</strong> or <code>Unlock-AltTab-NOW.bat</code>. Ctrl+Alt+Del and the physical power button cannot be blocked (Windows limit).</p>
             </div>
 
             <!-- Study YouTube -->
@@ -4873,7 +4873,7 @@
         </svg><span>Break earned. You can breathe now.</span></div>
       <button class="btn-back" data-action="hide-lock">← Back to App</button>
     </div>
-    <p class="lock-focus-hint" id="lockFocusHint">Fullscreen stays on until the timer ends. Switching to other apps (Alt+Tab, Discord, games) will pull you straight back here.</p>
+    <p class="lock-focus-hint" id="lockFocusHint">Fullscreen stays on until the timer ends. Alt+Tab, Alt+F4, and shutdown are blocked. Switching to other apps will pull you straight back here.</p>
     <button class="lock-return" id="lockReturnBtn" data-action="hide-lock">← Back to StudyFlow</button>
   </div>
 

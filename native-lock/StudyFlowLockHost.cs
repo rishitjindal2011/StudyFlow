@@ -62,6 +62,10 @@ namespace StudyFlowLock
         private const int VK_RCONTROL = 0xA3;
         private const int VK_D = 0x44;
         private const int VK_M = 0x4D;
+        private const int VK_F4 = 0x73;
+        private const int VK_X = 0x58;
+
+        private const int WM_QUERYENDSESSION = 0x0011;
 
         private static Thread hookThread;
         private static uint hookThreadId;
@@ -103,6 +107,12 @@ namespace StudyFlowLock
 
         [DllImport("kernel32.dll")]
         private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern bool ShutdownBlockReasonCreate(IntPtr hWnd, string reason);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShutdownBlockReasonDestroy(IntPtr hWnd);
 
         private static void Log(string msg)
         {
@@ -147,6 +157,8 @@ namespace StudyFlowLock
             if (vk == VK_ESCAPE && AltDown()) return true;
             if ((vk == VK_D || vk == VK_M || vk == VK_TAB) && WinDown()) return true;
             if (vk == VK_TAB && CtrlDown() && WinDown()) return true;
+            if (vk == VK_F4 && AltDown()) return true;
+            if (vk == VK_X && WinDown()) return true;
             return false;
         }
 
@@ -166,6 +178,42 @@ namespace StudyFlowLock
             return CallNextHookEx(hookId, nCode, wParam, lParam);
         }
 
+        private sealed class ShieldForm : Form
+        {
+            protected override void OnLoad(EventArgs e)
+            {
+                base.OnLoad(e);
+                ShowInTaskbar = false;
+                FormBorderStyle = FormBorderStyle.None;
+                Size = new System.Drawing.Size(0, 0);
+                Opacity = 0;
+                try
+                {
+                    ShutdownBlockReasonCreate(Handle, "StudyFlow focus session is active. Stop the timer first.");
+                }
+                catch { }
+            }
+
+            protected override void OnFormClosed(FormClosedEventArgs e)
+            {
+                try { ShutdownBlockReasonDestroy(Handle); } catch { }
+                base.OnFormClosed(e);
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WM_QUERYENDSESSION)
+                {
+                    if (!File.Exists(UnlockPath))
+                    {
+                        m.Result = IntPtr.Zero;
+                        return;
+                    }
+                }
+                base.WndProc(ref m);
+            }
+        }
+
         private static void HookThreadMain()
         {
             try
@@ -180,7 +228,7 @@ namespace StudyFlowLock
                 hookThreadId = GetCurrentThreadId();
                 hookActive = true;
                 Log("hook ACTIVE tid=" + hookThreadId + " pid=" + Process.GetCurrentProcess().Id);
-                Application.Run();
+                Application.Run(new ShieldForm());
                 UnhookWindowsHookEx(hookId);
                 hookId = IntPtr.Zero;
                 Log("hook stopped");

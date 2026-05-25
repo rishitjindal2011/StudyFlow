@@ -801,7 +801,7 @@
         }
       } catch (_) { }
       updatePcLockStatus();
-      showToast('Try Alt+Tab now. If stuck, run Unlock-AltTab-NOW.bat from Downloads.');
+      showToast('Shortcuts should work now. If stuck, run Unlock-AltTab-NOW.bat from Downloads.');
     }
 
     function releaseFocusSessionLock() {
@@ -1824,8 +1824,8 @@
           if (res?.installed && res?.ok) {
             el.className = 'pc-lock-status ready';
             el.textContent = isRun && !isBreak && res.locked
-              ? 'StudyFlow App — Alt+Tab block is ACTIVE.'
-              : 'StudyFlow App — Alt+Tab blocks automatically when you start focus.';
+              ? 'StudyFlow App — PC lock ACTIVE (Alt+Tab, Alt+F4, shutdown).'
+              : 'StudyFlow App — Alt+Tab, Alt+F4, and shutdown block when you start focus.';
             setPcLockInstallUi(true);
           } else {
             el.className = 'pc-lock-status missing';
@@ -1856,11 +1856,11 @@
         const extId = chrome.runtime.id;
         if (res?.installed && res?.ok) {
           el.className = 'pc-lock-status ready';
-          let txt = 'Connected — Alt+Tab blocks when you start a focus session.';
+          let txt = 'Connected — Alt+Tab, Alt+F4, and shutdown block when you start focus.';
           if (isRun && !isBreak && last?.locked) {
-            txt = 'Alt+Tab block is ACTIVE right now.';
+            txt = 'PC lock ACTIVE (Alt+Tab, Alt+F4, shutdown).';
           } else if (last?.locked === false && last?.ok === true) {
-            txt = 'Helper ready — start a focus session to activate Alt+Tab block.';
+            txt = 'Helper ready — start focus to activate PC lock.';
           }
           if (last && last.ok === false) {
             txt += ' Last error: ' + (last.detail || last.error || 'lock failed');
@@ -2221,7 +2221,9 @@
       document.getElementById('wEmoji').innerHTML = svgIcon(iconKey, 44, 44);
       document.getElementById('wTitle').textContent = isBlockedSite ? title : (isFocusLocked() ? 'Nice try.' : title);
       document.getElementById('wMsg').textContent = isBlockedSite ? msg : (isFocusLocked()
-        ? 'You can\'t switch to other apps during focus — Alt+Tab, Win+Tab, and clicking away will pull Chrome back to fullscreen.'
+        ? (desktopAvailable()
+          ? 'You can\'t leave during focus — Alt+Tab, Alt+F4, shutdown, and switching apps are blocked until the timer ends.'
+          : 'You can\'t switch to other apps during focus — Alt+Tab, Alt+F4, shutdown, Win+Tab, and clicking away will pull you back to fullscreen.')
         : msg);
       const pct = Math.min((escCount / ESC_DATA.length) * 100, 100);
       document.getElementById('wFill').style.width = pct + '%';

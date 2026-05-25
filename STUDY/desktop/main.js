@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, session } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const lock = require('./lock-control');
@@ -46,6 +46,14 @@ function domainBlocked(url) {
     if (!dom) return false;
     return host === dom || host.endsWith('.' + dom);
   });
+}
+
+function notifyFocusBlocked(message) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const msg = message || 'Finish or stop the focus timer before leaving StudyFlow.';
+  mainWindow.webContents.executeJavaScript(
+    "typeof showToast==='function'&&showToast(" + JSON.stringify(msg) + ");"
+  ).catch(() => {});
 }
 
 function applyWindowLock(on) {
@@ -141,9 +149,7 @@ function createWindow() {
   mainWindow.on('close', (e) => {
     if (shieldActive) {
       e.preventDefault();
-      mainWindow.webContents.executeJavaScript(
-        "typeof showToast==='function'&&showToast('Finish or stop the focus timer before closing StudyFlow.');"
-      ).catch(() => {});
+      notifyFocusBlocked('Finish or stop the focus timer before closing StudyFlow.');
     }
   });
 
@@ -188,6 +194,13 @@ ipcMain.handle('set-blocked-domains', async (_event, domains) => {
 ipcMain.handle('get-webview-preload-path', async () => {
   const p = path.join(getAppRoot(), 'webview-guest-preload.js');
   return fs.existsSync(p) ? p : '';
+});
+
+powerMonitor.on('shutdown', (e) => {
+  if (shieldActive) {
+    e.preventDefault();
+    notifyFocusBlocked('Shutdown is blocked during focus — stop the timer first.');
+  }
 });
 
 app.whenReady().then(() => {
